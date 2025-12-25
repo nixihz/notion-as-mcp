@@ -1,0 +1,53 @@
+# Binaries
+notion-mcp
+main
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+*.out
+
+# Go module cache
+vendor
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment (contains secrets)
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Coverage
+*.cover
+cover.out
+
+# Cache directory
+.cache/
+~/.cache/notion-mcp/
+
+# Temporary
+*.tmp
+*.temp
+tmp/
+
+# Secrets
+*credentials*
+*password*
+*token*

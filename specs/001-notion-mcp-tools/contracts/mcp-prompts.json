@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MCP Prompts Contract",
+  "description": "Prompt definitions for Notion MCP Server",
+  "type": "object",
+  "components": {
+    "prompt": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]*$",
+          "description": "Prompt name (from Notion page title, normalized)"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Prompt description"
+        },
+        "arguments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/promptArgument" },
+          "description": "Prompt arguments"
+        }
+      },
+      "required": ["name", "description"]
+    },
+    "promptArgument": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Argument name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Argument description"
+        },
+        "required": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether argument is required"
+        }
+      },
+      "required": ["name", "description"]
+    },
+    "promptMessage": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": ["user", "assistant", "system"]
+        },
+        "content": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string", "const": "text" },
+            "text": { "type": "string" }
+          },
+          "required": ["type", "text"]
+        }
+      },
+      "required": ["role", "content"]
+    },
+    "getPromptResponse": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Prompt description"
+        },
+        "messages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/promptMessage" }
+        }
+      },
+      "required": ["description", "messages"]
+    },
+    "listResponse": {
+      "type": "object",
+      "properties": {
+        "prompts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/prompt" }
+        }
+      },
+      "required": ["prompts"]
+    }
+  },
+  "$defs": {
+    "prompt": {
+      "$ref": "#/$defs/prompt"
+    },
+    "promptArgument": {
+      "$ref": "#/$defs/promptArgument"
+    },
+    "promptMessage": {
+      "$ref": "#/$defs/promptMessage"
+    }
+  },
+  "examples": [
+    {
+      "prompts": [
+        {
+          "name": "code_review",
+          "description": "Review code and suggest improvements",
+          "arguments": [
+            {
+              "name": "language",
+              "description": "Programming language",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "explain_error",
+          "description": "Explain an error message and suggest fixes",
+          "arguments": [
+            {
+              "name": "error_message",
+              "description": "The error message to explain",
+              "required": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
