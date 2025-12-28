@@ -38,26 +38,53 @@ Future features planned:
 
 ### Installation
 
+Choose one of the following installation methods:
+
+#### Method 1: Using `go install` (Recommended)
+
+Install directly from the repository:
+
+```bash
+go install github.com/nixihz/notion-as-mcp@latest
+```
+
+The binary will be installed to `$GOPATH/bin` (or `$HOME/go/bin` by default). Make sure this directory is in your `PATH`:
+
+```bash
+# Add to your ~/.bashrc, ~/.zshrc, or equivalent
+export PATH=$PATH:$(go env GOPATH)/bin
+```
+
+#### Method 2: Build from Source
+
 1. **Clone the repository**:
    ```bash
    git clone https://github.com/nixihz/notion-as-mcp.git
    cd notion-as-mcp
    ```
 
-2. **Build from source**:
+2. **Build the binary**:
    ```bash
    go build -o notion-mcp main.go
    ```
 
-3. **Configure environment**:
+3. **(Optional) Install to system**:
    ```bash
+   sudo mv notion-mcp /usr/local/bin/
+   ```
+
+### Configuration
+
+1. **Configure environment variables**:
+   ```bash
+   # Create .env file in your working directory
    cp .env.example .env
    # Edit .env with your Notion credentials
    ```
 
-4. **Run the server**:
+2. **Run the server**:
    ```bash
-   ./notion-mcp serve
+   notion-mcp serve
    ```
 
 ## Configuration
@@ -84,6 +111,7 @@ Future features planned:
    - Create or select a Notion database
    - Add a `Select` property named `Type` (or your custom name)
    - Add options: `prompt`, `resource`
+   - Add a `Text` property named `Description` for entry descriptions
    - Share the database with your integration
 
 3. **Get Database ID**:
@@ -100,13 +128,14 @@ Your Notion database must have:
 2. **Type property**: A `Select` type field with these options:
    - `prompt` - MCP prompt entries
    - `resource` - MCP resource entries
+3. **Description property**: A `Text` type field for entry descriptions (optional but recommended)
 
 ### Example Database
 
-| Name | Type |
-|------|------|
-| Code Review Prompt | prompt |
-| API Documentation | resource |
+| Name | Type | Description |
+|------|------|-------------|
+| Code Review Prompt | prompt | A helpful prompt for reviewing code quality and best practices |
+| API Documentation | resource | Complete API reference documentation |
 
 ### Entry Formats
 
