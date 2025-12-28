@@ -54,10 +54,15 @@ func extractRichText(content any) string {
 		if rt, ok := v["rich_text"].([]any); ok {
 			for _, r := range rt {
 				if m, ok := r.(map[string]any); ok {
-					texts = append(texts, RichText{
-						Content:   getMapString(m, "content"),
+					rt := RichText{
 						PlainText: getMapString(m, "plain_text"),
-					})
+					}
+					if textMap, ok := m["text"].(map[string]any); ok {
+						rt.Text = Text{
+							Content: getMapString(textMap, "content"),
+						}
+					}
+					texts = append(texts, rt)
 				}
 			}
 		}
@@ -85,11 +90,7 @@ func GetTypeFromProperties(properties map[string]Property, typeField string) str
 	for name, prop := range properties {
 		if name == typeField {
 			if prop.Type == PropertyTypeSelect {
-				if v, ok := prop.Value.(map[string]any); ok {
-					if name, ok := v["name"].(string); ok {
-						return name
-					}
-				}
+				return prop.Select.Name
 			}
 		}
 	}
@@ -113,10 +114,15 @@ func ParseCodeBlock(block Block) (CodeBlock, bool) {
 	if rt, ok := content["rich_text"].([]any); ok {
 		for _, r := range rt {
 			if m, ok := r.(map[string]any); ok {
-				richTexts = append(richTexts, RichText{
-					Content:   getMapString(m, "content"),
+				rt := RichText{
 					PlainText: getMapString(m, "plain_text"),
-				})
+				}
+				if textMap, ok := m["text"].(map[string]any); ok {
+					rt.Text = Text{
+						Content: getMapString(textMap, "content"),
+					}
+				}
+				richTexts = append(richTexts, rt)
 			}
 		}
 	}

@@ -3,6 +3,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -27,33 +28,21 @@ The server will listen for MCP protocol messages over stdio
 and communicate with Notion to provide prompts, resources,
 and tools based on your Notion database.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Load configuration
+			// Load and validate configuration
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("load config: %w", err)
 			}
-
-			// Validate configuration
 			if err := cfg.Validate(); err != nil {
 				return fmt.Errorf("validate config: %w", err)
 			}
 
-			// Initialize logger
-			if err := logger.Init(cfg); err != nil {
-				return fmt.Errorf("init logger: %w", err)
-			}
-
-			log := logger.Get()
-			log.Info("starting Notion MCP server",
-				slog.String("database_id", cfg.NotionDatabaseID),
-				slog.String("type_field", cfg.NotionTypeField),
-			)
-
-			// Create server
+			// Create server (initializes logger internally)
 			srv, err := server.NewServer(cfg)
 			if err != nil {
 				return fmt.Errorf("create server: %w", err)
 			}
+			defer srv.Stop()
 
 			// Setup context with cancellation
 			ctx, cancel := context.WithCancel(context.Background())
@@ -63,26 +52,25 @@ and tools based on your Notion database.`,
 			sigChan := make(chan os.Signal, 1)
 			signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-			// Start server in goroutine
+			// Start server and wait for completion or signal
 			errChan := make(chan error, 1)
 			go func() {
 				errChan <- srv.Start(ctx)
 			}()
 
-			// Wait for shutdown signal or error
 			select {
 			case sig := <-sigChan:
-				log.Info("received signal", slog.String("signal", sig.String()))
+				logger.Get().Info("received signal", slog.String("signal", sig.String()))
 				cancel()
+				// Wait for server to stop gracefully
+				if err := <-errChan; err != nil && !errors.Is(err, context.Canceled) {
+					return fmt.Errorf("server error: %w", err)
+				}
 			case err := <-errChan:
 				if err != nil {
 					return fmt.Errorf("server error: %w", err)
 				}
 			}
-
-			// Stop server
-			srv.Stop()
-			log.Info("server stopped")
 
 			return nil
 		},

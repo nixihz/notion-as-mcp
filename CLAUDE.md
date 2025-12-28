@@ -10,7 +10,7 @@ This file provides guidance for Claude Code when working with this codebase.
 
 ## Project Overview
 
-Notion-as-MCP 是一个 MCP (Model Context Protocol) 服务器，将 Notion 数据库作为数据源，通过类型字段区分 prompt/resource/tool 三种 MCP 原语。
+Notion-as-MCP is an MCP (Model Context Protocol) server that uses Notion databases as data sources, distinguishing three MCP primitives (prompt/resource/tool) through type fields.
 
 ## Technology Stack
 
@@ -19,7 +19,7 @@ Notion-as-MCP 是一个 MCP (Model Context Protocol) 服务器，将 Notion 数�
 - **CLI**: github.com/spf13/cobra
 - **Config**: github.com/joho/godotenv (env files)
 - **Logging**: log/slog (Go 1.21+ standard library)
-- **Transport**: stdio (无 Web 界面)
+- **Transport**: stdio (no web interface)
 
 ## Project Structure
 
@@ -41,17 +41,17 @@ notion-mcp/
 
 ## Key Design Decisions
 
-1. **双层缓存**: 内存缓存（5分钟 TTL）+ 文件缓存（1小时 TTL）
-2. **代码执行**: 支持 bash/python/js，需配置允许列表
-3. **速率限制**: 指数退避重试，Notion API 限制每秒 3 请求
-4. **类型字段**: 默认使用 "Type" 属性，可配置
+1. **Two-layer caching**: Memory cache (5 minutes TTL) + file cache (1 hour TTL)
+2. **Code execution**: Supports bash/python/js, requires allowlist configuration
+3. **Rate limiting**: Exponential backoff retry, Notion API limits to 3 requests per second
+4. **Type field**: Defaults to "Type" property, configurable
 
 ## Configuration
 
 | Variable | Description |
 |----------|-------------|
-| `NOTION_API_KEY` | Notion Integration Token (必需) |
-| `NOTION_DATABASE_ID` | Database ID (必需) |
+| `NOTION_API_KEY` | Notion Integration Token (required) |
+| `NOTION_DATABASE_ID` | Database ID (required) |
 | `NOTION_TYPE_FIELD` | Type property name (默认: Type) |
 | `CACHE_TTL` | Cache TTL (默认: 5m) |
 | `LOG_LEVEL` | debug/info/warn/error |
@@ -59,40 +59,40 @@ notion-mcp/
 ## Commands
 
 ```bash
-# 开发运行
+# Development run
 go run main.go serve
 
-# 构建
+# Build
 go build -o notion-mcp main.go
 
-# 测试
+# Test
 go test ./...
 ```
 
 ## MCP Protocol
 
-服务器通过 stdio 实现 MCP 协议：
+The server implements MCP protocol through stdio:
 
-- `prompts/list` - 列出 prompt
-- `prompts/get` - 获取 prompt 内容
-- `resources/list` - 列出 resource
-- `resources/read` - 读取 resource
-- `tools/list` - 列出 tool
-- `tools/call` - 调用 tool
+- `prompts/list` - List prompts
+- `prompts/get` - Get prompt content
+- `resources/list` - List resources
+- `resources/read` - Read resource
+- `tools/list` - List tools
+- `tools/call` - Call tool
 
 ## Notion Data Model
 
-- **Database**: 包含类型字段的 Notion 数据库
-- **Page**: 条目，properties 包含类型信息
-- **Block**: 内容块，代码块类型用于 tool
-- **Code Block**: `type: code`，包含 language 和代码内容
+- **Database**: Notion database containing type fields
+- **Page**: Entry, properties contain type information
+- **Block**: Content block, code block type used for tools
+- **Code Block**: `type: code`, contains language and code content
 
 ## Code Execution Security
 
-- 仅执行单个代码块
-- 超时限制（默认 30s）
-- 无文件 I/O 限制
-- 可配置允许的语言列表
+- Execute only single code blocks
+- Timeout limit (default 30s)
+- No file I/O restrictions
+- Configurable allowed language list
 
 ---
 

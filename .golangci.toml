@@ -1,68 +1,65 @@
-run.timeout = 5m
+run.timeout = "5m"
 output.format = "colored-line-number"
 output.print-issued-lines = true
 output.print-linter-name = true
 
-linters:
-  enable-all = false
-  enable:
-    - errcheck
-    - gosimple
-    - govet
-    - ineffassign
-    - staticcheck
-    - typecheck
-    - unused
-    - gofmt
-    - goimports
-    - misspell
-    - unconvert
-    - dupl
-    - goconst
-    - gocyclo
-    - gosec
+linters.enable-all = false
+linters.enable = [
+  "errcheck",
+  "gosimple",
+  "govet",
+  "ineffassign",
+  "staticcheck",
+  "typecheck",
+  "unused",
+  "gofmt",
+  "goimports",
+  "misspell",
+  "unconvert",
+  "dupl",
+  "goconst",
+  "gocyclo",
+  "gosec",
+]
 
-linters-settings:
-  errcheck:
-    check-type-assertions = true
-    check-blank = true
-  
-  govet:
-    check-shadowing = true
-    enable-all = true
-  
-  gofmt:
-    simplify = true
-  
-  goimports:
-    local-prefixes = "github.com/anthropics/notion-as-mcp"
-  
-  dupl:
-    threshold = 100
-  
-  goconst:
-    min-len = 3
-    min-occurrences = 3
-  
-  gocyclo:
-    min-complexity = 15
-  
-  misspell:
-    locale = ""
-  
-  staticcheck:
-    checks = ["all"]
+[linters-settings.errcheck]
+check-type-assertions = true
+check-blank = true
 
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - dupl
-        - goconst
-    - path: internal/mock/
-      linters:
-        - dupl
+[linters-settings.govet]
+check-shadowing = true
+enable-all = true
 
-  max-issues-per-linter = 50
-  max-same-issues = 3
-  new = false
+[linters-settings.gofmt]
+simplify = true
+
+[linters-settings.goimports]
+local-prefixes = "github.com/nixihz/notion-as-mcp"
+
+[linters-settings.dupl]
+threshold = 100
+
+[linters-settings.goconst]
+min-len = 3
+min-occurrences = 3
+
+[linters-settings.gocyclo]
+min-complexity = 15
+
+[linters-settings.misspell]
+locale = ""
+
+[linters-settings.staticcheck]
+checks = ["all"]
+
+[[issues.exclude-rules]]
+path = "_test\\.go"
+linters = ["dupl", "goconst"]
+
+[[issues.exclude-rules]]
+path = "internal/mock/"
+linters = ["dupl"]
+
+issues.max-issues-per-linter = 50
+issues.max-same-issues = 3
+issues.new = false

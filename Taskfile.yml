@@ -1,0 +1,21 @@
+# https://taskfile.dev
+
+version: '3'
+
+vars:
+  GREETING: Hello, World!
+
+tasks:
+  default:
+    cmds:
+      - task --list-all
+
+  build:
+    desc: "Build the application"
+    cmds:
+      - go build -o notion-as-mcp main.go
+
+  serve:
+    desc: "Run the application"
+    cmds:
+      - go run main.go serve

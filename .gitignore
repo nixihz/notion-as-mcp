@@ -1,5 +1,5 @@
 # Binaries
-notion-mcp
+notion-as-mcp
 main
 *.exe
 *.exe~
@@ -40,7 +40,6 @@ cover.out
 
 # Cache directory
 .cache/
-~/.cache/notion-mcp/
 
 # Temporary
 *.tmp

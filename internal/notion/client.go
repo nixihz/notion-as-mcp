@@ -7,18 +7,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 )
 
 // Client is a Notion API client.
 type Client struct {
-	apiKey      string
-	databaseID  string
-	typeField   string
-	httpClient  *http.Client
-	baseURL     string
-	apiVersion  string
+	apiKey     string
+	databaseID string
+	typeField  string
+	httpClient *http.Client
+	baseURL    string
+	apiVersion string
 }
 
 // NewClient creates a new Notion API client.
@@ -35,27 +36,59 @@ func NewClient(apiKey, databaseID, typeField string) *Client {
 	}
 }
 
-// QueryDatabase queries a Notion database and returns pages.
-func (c *Client) QueryDatabase(ctx context.Context, filter *DatabaseQueryFilter) ([]Page, error) {
+// QueryDatabase queries a Notion database and returns all pages.
+// Handles pagination automatically.
+func (c *Client) QueryDatabase(ctx context.Context) ([]Page, error) {
 	url := fmt.Sprintf("%s/databases/%s/query", c.baseURL, c.databaseID)
 
-	var reqBody interface{} = nil
-	if filter != nil {
-		reqBody = filter
+	var allPages []Page
+	var nextCursor *string
+
+	for {
+		// Build request body: empty object {} or with start_cursor for pagination
+		reqBody := map[string]interface{}{}
+		if nextCursor != nil {
+			reqBody["start_cursor"] = *nextCursor
+		}
+
+		body, err := json.Marshal(reqBody)
+		if err != nil {
+			return nil, fmt.Errorf("marshal query: %w", err)
+		}
+
+		type queryResponse struct {
+			Results    []Page  `json:"results"`
+			HasMore    bool    `json:"has_more"`
+			NextCursor *string `json:"next_cursor"`
+		}
+
+		var resp queryResponse
+		err = c.doRequest(ctx, "POST", url, bytes.NewReader(body), &resp)
+		if err != nil {
+			return nil, err
+		}
+
+		allPages = append(allPages, resp.Results...)
+
+		// Stop if no more pages
+		if !resp.HasMore {
+			break
+		}
+
+		// Stop if next_cursor is nil (shouldn't happen if has_more is true, but safety check)
+		if resp.NextCursor == nil {
+			break
+		}
+
+		nextCursor = resp.NextCursor
 	}
 
-	body, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("marshal query: %w", err)
-	}
+	return allPages, nil
+}
 
-	var pages []Page
-	err = c.doRequest(ctx, "POST", url, bytes.NewReader(body), &pages)
-	if err != nil {
-		return nil, err
-	}
-
-	return pages, nil
+// GetAllPages retrieves all pages from the database without filtering.
+func (c *Client) GetAllPages(ctx context.Context) ([]Page, error) {
+	return c.QueryDatabase(ctx)
 }
 
 // GetPage retrieves a single page by ID.
@@ -162,6 +195,14 @@ func (c *Client) doRequest(ctx context.Context, method, url string, body io.Read
 			json.NewDecoder(resp.Body).Decode(&errResp)
 			return fmt.Errorf("notion API error: %s (%s)", errResp.Message, errResp.Code)
 		}
+		// Read response body for decoding
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("read response body: %w", err)
+		}
+		resp.Body = io.NopCloser(bytes.NewReader(body))
+		// Debug log for API response (only in debug mode)
+		slog.Debug("notion API response", "status", resp.StatusCode, "body_size", len(body))
 
 		if response != nil {
 			if err := json.NewDecoder(resp.Body).Decode(response); err != nil {
@@ -173,50 +214,4 @@ func (c *Client) doRequest(ctx context.Context, method, url string, body io.Read
 	}
 
 	return fmt.Errorf("max retries exceeded")
-}
-
-// DatabaseQueryFilter represents a filter for database queries.
-type DatabaseQueryFilter struct {
-	Filter Filter `json:"filter"`
-}
-
-// Filter represents a Notion filter.
-type Filter struct {
-	Property string      `json:"property"`
-	Select   SelectFilter `json:"select"`
-	Date     DateFilter   `json:"date"`
-}
-
-// SelectFilter filters by select property.
-type SelectFilter struct {
-	Equals string `json:"equals"`
-}
-
-// DateFilter filters by date property.
-type DateFilter struct {
-	After string `json:"after"`
-}
-
-// NewTypeFilter creates a filter for a specific type.
-func NewTypeFilter(typeField, typeValue string) *DatabaseQueryFilter {
-	return &DatabaseQueryFilter{
-		Filter: Filter{
-			Property: typeField,
-			Select: SelectFilter{
-				Equals: typeValue,
-			},
-		},
-	}
-}
-
-// NewUpdatedSinceFilter creates a filter for pages updated after a time.
-func NewUpdatedSinceFilter(since time.Time) *DatabaseQueryFilter {
-	return &DatabaseQueryFilter{
-		Filter: Filter{
-			Property: "last_edited_time",
-			Date: DateFilter{
-				After: since.Format(time.RFC3339),
-			},
-		},
-	}
 }

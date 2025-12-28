@@ -1,168 +1,253 @@
 # Notion as MCP Server
 
-将 Notion 数据库作为 MCP (Model Context Protocol) 数据源的服务器，支持 prompts、resources 和 tools 三种 MCP 原语。
+Dynamically generate MCP Prompts/Resources/Tools from Notion databases.
 
-## 功能特性
+A server that uses Notion databases as MCP (Model Context Protocol) data sources, supporting three MCP primitives: prompts, resources, and tools.
 
-- **Prompts**: 从 Notion 中提取 prompt 类型条目
-- **Resources**: 从 Notion 中提取 resource 类型条目
-- **Tools**: 从 Notion 中提取 tool 类型条目并执行代码块
-- **双层缓存**: 内存缓存 (5分钟) + 文件缓存 (1小时)
-- **代码执行**: 支持 bash、python、javascript
-- **类型过滤**: 通过 Notion 数据库的 type 字段区分不同类型
+## Overview
 
-## 安装
+Notion-as-MCP transforms your Notion databases into a powerful MCP server, allowing you to:
 
-### 从源码构建
+- **Manage prompts** directly in Notion and use them in MCP clients
+- **Store resources** as documentation or reference materials
+- **Create executable tools** by writing code blocks in Notion pages
 
-```bash
-go build -o notion-mcp main.go
-```
+All content is automatically synced from your Notion database, with intelligent caching to minimize API calls.
 
-### 运行
+## Features
 
-```bash
-./notion-mcp serve
-```
+- **Prompts**: Extract and serve prompt-type entries from Notion
+- **Resources**: Extract and serve resource-type entries from Notion
+- **Tools**: Extract tool-type entries from Notion and execute code blocks
+- **Two-layer caching**: Memory cache (5 minutes) + file cache (1 hour) for optimal performance
+- **Code execution**: Supports bash, python, and javascript with configurable allowlists
+- **Type filtering**: Automatically distinguishes types through configurable database fields
+- **Rate limiting**: Built-in exponential backoff for Notion API rate limits
 
-## 配置
+## Quick Start
 
-### 环境变量
+### Prerequisites
 
-| 变量 | 描述 | 默认值 |
-|------|------|--------|
-| `NOTION_API_KEY` | Notion Integration Token | 必需 |
-| `NOTION_DATABASE_ID` | Notion Database ID | 必需 |
-| `NOTION_TYPE_FIELD` | 类型字段名称 | `Type` |
-| `CACHE_TTL` | 缓存 TTL | `5m` |
-| `CACHE_DIR` | 缓存目录 | `~/.cache/notion-mcp` |
-| `LOG_LEVEL` | 日志级别 | `info` |
-| `EXEC_TIMEOUT` | 代码执行超时 | `30s` |
-| `EXEC_LANGUAGES` | 允许执行的语言 | `bash,python,js` |
+- Go 1.24+ (for building from source)
+- A Notion account with API access
+- A Notion database configured with a `Type` field
 
-### .env 文件
+### Installation
 
-```bash
-cp .env.example .env
-```
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/nixihz/notion-as-mcp.git
+   cd notion-as-mcp
+   ```
 
-然后编辑 `.env` 文件填入你的配置。
+2. **Build from source**:
+   ```bash
+   go build -o notion-mcp main.go
+   ```
 
-## Notion 数据库要求
+3. **Configure environment**:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your Notion credentials
+   ```
 
-数据库需要包含：
+4. **Run the server**:
+   ```bash
+   ./notion-mcp serve
+   ```
 
-1. **Name 属性**: 条目标题
-2. **Type 属性**: Select 类型，可选值为：
-   - `prompt` - MCP prompt
-   - `resource` - MCP resource
-   - `tool` - MCP tool (需要包含代码块)
+## Configuration
 
-### 示例数据库结构
+### Environment Variables
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `NOTION_API_KEY` | Notion Integration Token | - | ✅ |
+| `NOTION_DATABASE_ID` | Notion Database ID | - | ✅ |
+| `NOTION_TYPE_FIELD` | Type field name in database | `Type` | ❌ |
+| `CACHE_TTL` | Cache time-to-live | `5m` | ❌ |
+| `CACHE_DIR` | Cache directory path | `~/.cache/notion-mcp` | ❌ |
+| `LOG_LEVEL` | Logging level (debug/info/warn/error) | `info` | ❌ |
+| `EXEC_TIMEOUT` | Code execution timeout | `30s` | ❌ |
+| `EXEC_LANGUAGES` | Comma-separated allowed languages | `bash,python,js` | ❌ |
+
+### Setting Up Notion
+
+1. **Create a Notion Integration**:
+   - Go to https://www.notion.so/my-integrations
+   - Create a new integration
+   - Copy the Integration Token
+
+2. **Prepare Your Database**:
+   - Create or select a Notion database
+   - Add a `Select` property named `Type` (or your custom name)
+   - Add options: `prompt`, `resource`, `tool`
+   - Share the database with your integration
+
+3. **Get Database ID**:
+   - Open your database in Notion
+   - Copy the ID from the URL (the part after the last `/` and before `?`)
+
+## Notion Database Structure
+
+### Required Properties
+
+Your Notion database must have:
+
+1. **Name property**: The title of each entry (standard Notion property)
+2. **Type property**: A `Select` type field with these options:
+   - `prompt` - MCP prompt entries
+   - `resource` - MCP resource entries
+   - `tool` - MCP tool entries (must contain code blocks)
+
+### Example Database
 
 | Name | Type |
 |------|------|
-| My Prompt | prompt |
-| Documentation | resource |
-| Run Script | tool |
+| Code Review Prompt | prompt |
+| API Documentation | resource |
+| Git Commit Tool | tool |
 
-### Tool 条目格式
+### Entry Formats
 
-Tool 类型条目需要包含一个代码块：
+#### Prompt Entry
+Simply add text content to the page. The entire page content will be used as the prompt.
+
+#### Resource Entry
+Add any documentation or reference material. The content will be served as a resource.
+
+#### Tool Entry
+Tool entries must contain a code block with executable code:
 
 ```markdown
-# 工具名称
+# Tool Name
 
-这是工具的描述...
+Description of what this tool does...
 
 ```bash
-echo "Hello, World!"
+#!/bin/bash
+# Your code here
+echo "Hello from Notion!"
 ```
 ```
 
-## 使用方法
+The code block language determines the execution environment (bash, python, or javascript).
 
-### Claude Desktop 配置
+## Usage
 
-添加到 `~/.config/claude-desktop/claude_desktop_config.json`:
+### Claude Desktop Integration
+
+Add the server to your Claude Desktop configuration at `~/.config/claude-desktop/claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "notion": {
-      "command": "/path/to/notion-mcp",
+      "command": "/absolute/path/to/notion-mcp",
       "args": ["serve"]
     }
   }
 }
 ```
 
-### MCP Protocol 支持
+Restart Claude Desktop to load the server.
 
-服务器实现以下 MCP 端点：
+### MCP Protocol Endpoints
 
-- `prompts/list` - 列出所有 prompts
-- `prompts/get` - 获取指定 prompt
-- `resources/list` - 列出所有 resources
-- `resources/read` - 读取 resource 内容
-- `tools/list` - 列出所有 tools
-- `tools/call` - 调用 tool（执行代码）
+The server implements the following MCP endpoints:
 
-## 项目结构
+- **`prompts/list`** - List all available prompts
+- **`prompts/get`** - Get a specific prompt by name
+- **`resources/list`** - List all available resources
+- **`resources/read`** - Read resource content by URI
+- **`tools/list`** - List all available tools
+- **`tools/call`** - Execute a tool with parameters
+
+## Project Structure
 
 ```
 notion-mcp/
 ├── cmd/
-│   ├── root.go          # Cobra root 命令
-│   └── serve.go         # serve 子命令
+│   ├── root.go          # Cobra root command
+│   └── serve.go         # serve subcommand
 ├── internal/
-│   ├── cache/           # 缓存实现
-│   │   ├── cache.go     # 缓存接口
-│   │   ├── memory.go    # 内存缓存
-│   │   ├── file.go      # 文件缓存
-│   │   └── layered.go   # 双层缓存
-│   ├── config/          # 配置加载
+│   ├── cache/           # Cache implementation
+│   │   ├── cache.go     # Cache interface
+│   │   ├── memory.go    # Memory cache
+│   │   ├── file.go      # File cache
+│   │   └── layered.go   # Two-layer cache
+│   ├── config/          # Configuration loading
 │   │   └── config.go
-│   ├── logger/          # 日志记录
+│   ├── logger/          # Logging
 │   │   └── logger.go
-│   ├── notion/          # Notion API 客户端
-│   │   ├── client.go    # API 客户端
-│   │   ├── models.go    # 数据模型
-│   │   └── parser.go    # 内容解析器
-│   ├── server/          # MCP 服务器
-│   │   ├── server.go    # 服务器主逻辑
-│   │   ├── prompts.go   # Prompt 处理器
-│   │   └── resources.go # Resource 处理器
-│   ├── tools/           # 工具执行
-│   │   ├── executor.go  # 代码执行器
-│   │   └── registry.go  # 工具注册表
-│   └── transport/       # 传输层
-│       └── stdio.go     # stdio 传输
-├── main.go              # 入口点
-├── go.mod
-└── .env.example
+│   ├── notion/          # Notion API client
+│   │   ├── client.go    # API client
+│   │   ├── models.go    # Data models
+│   │   ├── parser.go    # Content parser
+│   │   └── markdown.go  # Markdown conversion
+│   ├── server/          # MCP server
+│   │   ├── server.go    # Server main logic
+│   ├── tools/           # Tool execution
+│   │   ├── executor.go  # Code executor
+│   │   └── registry.go  # Tool registry
+│   └── transport/       # Transport layer
+│       └── stdio.go     # stdio transport
+├── main.go              # Entry point
+├── LICENSE              # MIT License
+└── .env.example        # Example configuration
 ```
 
-## 开发
+## Development
 
-### 运行测试
+### Running Tests
 
 ```bash
 go test ./...
 ```
 
-### 代码检查
+### Code Linting
 
 ```bash
 golangci-lint run
 ```
 
-## 安全注意事项
+### Development Mode
 
-- 工具执行支持语言白名单配置
-- 代码执行有超时限制 (默认 30 秒)
-- 建议在隔离环境中运行代码执行
+```bash
+go run main.go serve
+```
 
-## 许可证
+## Security Considerations
+
+- **Language allowlist**: Only configured languages can be executed
+- **Timeout limits**: Code execution is limited to 30 seconds by default
+- **Isolated execution**: Consider running in a sandboxed environment for production
+- **API key security**: Never commit your `.env` file or expose API keys
+
+## Troubleshooting
+
+### Common Issues
+
+**Server won't start**
+- Verify `NOTION_API_KEY` and `NOTION_DATABASE_ID` are set correctly
+- Check that your Notion integration has access to the database
+- Review logs with `LOG_LEVEL=debug`
+
+**Tools not appearing**
+- Ensure database entries have `Type` set to `tool`
+- Verify entries contain code blocks
+- Check that code block language is in `EXEC_LANGUAGES`
+
+**Rate limiting errors**
+- Increase `CACHE_TTL` to reduce API calls
+- The server automatically retries with exponential backoff
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
 
 MIT
+
+See [LICENSE](LICENSE) for details.

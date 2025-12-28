@@ -14,9 +14,9 @@ import (
 // Config holds all configuration for the Notion MCP server.
 type Config struct {
 	// Notion API configuration
-	NotionAPIKey     string        `json:"notion_api_key"`
-	NotionDatabaseID string        `json:"notion_database_id"`
-	NotionTypeField  string        `json:"notion_type_field"`
+	NotionAPIKey     string `json:"notion_api_key"`
+	NotionDatabaseID string `json:"notion_database_id"`
+	NotionTypeField  string `json:"notion_type_field"`
 
 	// Cache configuration
 	CacheTTL time.Duration `json:"cache_ttl"`
@@ -30,8 +30,8 @@ type Config struct {
 	ExecLanguages string        `json:"exec_languages"`
 
 	// Change detection configuration
-	PollInterval    time.Duration `json:"poll_interval"`
-	RefreshOnStart  bool          `json:"refresh_on_start"`
+	PollInterval   time.Duration `json:"poll_interval"`
+	RefreshOnStart bool          `json:"refresh_on_start"`
 }
 
 // Default values.
@@ -41,7 +41,7 @@ const (
 	defaultCacheDir    = "~/.cache/notion-mcp"
 	defaultLogLevel    = "info"
 	defaultExecTimeout = 30 * time.Second
-	defaultExecLang    = "bash,python,js"
+	defaultExecLang    = "bash,python,js,javascript,ts,typescript"
 	defaultPollInt     = 60 * time.Second
 	defaultRefreshOn   = true
 )

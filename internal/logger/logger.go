@@ -2,11 +2,13 @@
 package logger
 
 import (
-	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/nixihz/notion-as-mcp/internal/config"
 )
@@ -14,6 +16,8 @@ import (
 var (
 	// defaultLogger is the global logger instance.
 	defaultLogger *slog.Logger
+	// logFile is the current log file handle
+	logFile *os.File
 	// once ensures the default logger is initialized only once.
 	once sync.Once
 )
@@ -39,8 +43,27 @@ func Init(cfg *config.Config) error {
 			Level: level,
 		}
 
-		// Use JSON handler for structured logging
-		defaultLogger = slog.New(slog.NewJSONHandler(os.Stdout, handlerOptions))
+		// Create logs directory and log file
+		logDir := "logs"
+		if err := os.MkdirAll(logDir, 0755); err != nil {
+			initErr = fmt.Errorf("failed to create logs directory: %w", err)
+			return
+		}
+
+		// Generate log filename with current date (YYYYMMDD.log)
+		currentDate := time.Now().Format("20060102")
+		logFilePath := filepath.Join(logDir, fmt.Sprintf("%s.log", currentDate))
+
+		// Open log file in append mode, create if not exists
+		file, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			initErr = fmt.Errorf("failed to open log file: %w", err)
+			return
+		}
+		logFile = file
+
+		// Use JSON handler for structured logging (output to file only)
+		defaultLogger = slog.New(slog.NewJSONHandler(logFile, handlerOptions))
 		slog.SetDefault(defaultLogger)
 	})
 	return initErr
@@ -94,11 +117,6 @@ func Err(msg string, err error, args ...any) {
 	}
 }
 
-// Context returns a context with the logger.
-func Context(ctx context.Context) context.Context {
-	return context.WithValue(ctx, "logger", defaultLogger)
-}
-
 // SetOutput redirects the logger output to the given writer.
 // Note: In Go 1.25, we need to create a new handler with the new writer.
 // This is a limitation of the current implementation.
@@ -110,4 +128,14 @@ func SetOutput(w io.Writer) {
 		defaultLogger = slog.New(slog.NewJSONHandler(w, handlerOptions))
 		slog.SetDefault(defaultLogger)
 	}
+}
+
+// Close closes the log file if it is open.
+func Close() error {
+	if logFile != nil {
+		err := logFile.Close()
+		logFile = nil
+		return err
+	}
+	return nil
 }

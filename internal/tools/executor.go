@@ -3,6 +3,7 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -38,7 +39,7 @@ type ExecutionResult struct {
 }
 
 // Execute executes code in the specified language.
-func (e *Executor) Execute(ctx context.Context, language, code string) (*ExecutionResult, error) {
+func (e *Executor) Execute(ctx context.Context, language, code string, input any) (*ExecutionResult, error) {
 	// Check if language is allowed
 	if !e.isLanguageAllowed(language) {
 		return nil, fmt.Errorf("language %q is not allowed", language)
@@ -53,11 +54,13 @@ func (e *Executor) Execute(ctx context.Context, language, code string) (*Executi
 
 	switch language {
 	case "bash", "sh":
-		output, exitCode, err = e.executeBash(ctx, code)
+		output, exitCode, err = e.executeBash(ctx, code, input)
 	case "python", "py":
-		output, exitCode, err = e.executePython(ctx, code)
+		output, exitCode, err = e.executePython(ctx, code, input)
 	case "js", "javascript":
-		output, exitCode, err = e.executeNode(ctx, code)
+		output, exitCode, err = e.executeNode(ctx, code, input)
+	case "ts", "typescript":
+		output, exitCode, err = e.executeTsNode(ctx, code, input)
 	default:
 		return nil, fmt.Errorf("unsupported language: %s", language)
 	}
@@ -83,7 +86,7 @@ func (e *Executor) isLanguageAllowed(language string) bool {
 }
 
 // executeBash executes bash code.
-func (e *Executor) executeBash(ctx context.Context, code string) (string, int, error) {
+func (e *Executor) executeBash(ctx context.Context, code string, input any) (string, int, error) {
 	cmd := exec.CommandContext(ctx, "bash", "-c", code)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -96,7 +99,7 @@ func (e *Executor) executeBash(ctx context.Context, code string) (string, int, e
 }
 
 // executePython executes python code.
-func (e *Executor) executePython(ctx context.Context, code string) (string, int, error) {
+func (e *Executor) executePython(ctx context.Context, code string, input any) (string, int, error) {
 	cmd := exec.CommandContext(ctx, "python3", "-c", code)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -109,8 +112,32 @@ func (e *Executor) executePython(ctx context.Context, code string) (string, int,
 }
 
 // executeNode executes JavaScript code.
-func (e *Executor) executeNode(ctx context.Context, code string) (string, int, error) {
+func (e *Executor) executeNode(ctx context.Context, code string, input any) (string, int, error) {
 	cmd := exec.CommandContext(ctx, "node", "-e", code)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return string(output), exitErr.ExitCode(), nil
+		}
+		return string(output), -1, err
+	}
+	return string(output), 0, nil
+}
+
+func (e *Executor) executeTsNode(ctx context.Context, code string, input any) (string, int, error) {
+	jsonInput, err := json.Marshal(input)
+	if err != nil {
+		return "", -1, fmt.Errorf("failed to marshal input: %w", err)
+	}
+	// Escape the JSON string for safe embedding in JavaScript string literal
+	// Escape backslashes first, then single quotes
+	jsonStr := strings.ReplaceAll(string(jsonInput), `\`, `\\`)
+	jsonStr = strings.ReplaceAll(jsonStr, `'`, `\'`)
+	// Use JSON.parse to safely parse the JSON string, and console.log to output the result
+	codeRun := fmt.Sprintf("%s\n console.log(JSON.stringify(handle(JSON.parse('%s'))));", code, jsonStr)
+	cmd := exec.CommandContext(ctx, "npx", "ts-node", "--compiler-options",
+		`{"module":"commonjs","moduleResolution":"node"}`, "-e", codeRun)
+	cmd.Env = append(cmd.Env, "NODE_TLS_REJECT_UNAUTHORIZED=0")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
