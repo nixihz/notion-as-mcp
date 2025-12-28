@@ -1,8 +1,8 @@
 # Notion as MCP Server
 
-Dynamically generate MCP Prompts/Resources/Tools from Notion databases.
+Dynamically generate MCP Prompts/Resources from Notion databases.
 
-A server that uses Notion databases as MCP (Model Context Protocol) data sources, supporting three MCP primitives: prompts, resources, and tools.
+A server that uses Notion databases as MCP (Model Context Protocol) data sources.
 
 ## Overview
 
@@ -10,7 +10,6 @@ Notion-as-MCP transforms your Notion databases into a powerful MCP server, allow
 
 - **Manage prompts** directly in Notion and use them in MCP clients
 - **Store resources** as documentation or reference materials
-- **Create executable tools** by writing code blocks in Notion pages
 
 All content is automatically synced from your Notion database, with intelligent caching to minimize API calls.
 
@@ -18,10 +17,15 @@ All content is automatically synced from your Notion database, with intelligent 
 
 - **Prompts**: Extract and serve prompt-type entries from Notion
 - **Resources**: Extract and serve resource-type entries from Notion
-- **Tools**: Extract tool-type entries from Notion and execute code blocks
 - **Two-layer caching**: Memory cache (5 minutes) + file cache (1 hour) for optimal performance
-- **Code execution**: Supports bash, python, and javascript with configurable allowlists
 - **Type filtering**: Automatically distinguishes types through configurable database fields
+
+## Roadmap
+
+Future features planned:
+
+- **Tools**: Extract tool-type entries from Notion and execute code blocks (bash, python, javascript)
+- **Code execution**: Configurable language allowlists and timeout limits
 - **Rate limiting**: Built-in exponential backoff for Notion API rate limits
 
 ## Quick Start
@@ -68,8 +72,6 @@ All content is automatically synced from your Notion database, with intelligent 
 | `CACHE_TTL` | Cache time-to-live | `5m` | ❌ |
 | `CACHE_DIR` | Cache directory path | `~/.cache/notion-mcp` | ❌ |
 | `LOG_LEVEL` | Logging level (debug/info/warn/error) | `info` | ❌ |
-| `EXEC_TIMEOUT` | Code execution timeout | `30s` | ❌ |
-| `EXEC_LANGUAGES` | Comma-separated allowed languages | `bash,python,js` | ❌ |
 
 ### Setting Up Notion
 
@@ -81,7 +83,7 @@ All content is automatically synced from your Notion database, with intelligent 
 2. **Prepare Your Database**:
    - Create or select a Notion database
    - Add a `Select` property named `Type` (or your custom name)
-   - Add options: `prompt`, `resource`, `tool`
+   - Add options: `prompt`, `resource`
    - Share the database with your integration
 
 3. **Get Database ID**:
@@ -98,7 +100,6 @@ Your Notion database must have:
 2. **Type property**: A `Select` type field with these options:
    - `prompt` - MCP prompt entries
    - `resource` - MCP resource entries
-   - `tool` - MCP tool entries (must contain code blocks)
 
 ### Example Database
 
@@ -106,7 +107,6 @@ Your Notion database must have:
 |------|------|
 | Code Review Prompt | prompt |
 | API Documentation | resource |
-| Git Commit Tool | tool |
 
 ### Entry Formats
 
@@ -115,23 +115,6 @@ Simply add text content to the page. The entire page content will be used as the
 
 #### Resource Entry
 Add any documentation or reference material. The content will be served as a resource.
-
-#### Tool Entry
-Tool entries must contain a code block with executable code:
-
-```markdown
-# Tool Name
-
-Description of what this tool does...
-
-```bash
-#!/bin/bash
-# Your code here
-echo "Hello from Notion!"
-```
-```
-
-The code block language determines the execution environment (bash, python, or javascript).
 
 ## Usage
 
@@ -160,8 +143,6 @@ The server implements the following MCP endpoints:
 - **`prompts/get`** - Get a specific prompt by name
 - **`resources/list`** - List all available resources
 - **`resources/read`** - Read resource content by URI
-- **`tools/list`** - List all available tools
-- **`tools/call`** - Execute a tool with parameters
 
 ## Project Structure
 
@@ -186,8 +167,8 @@ notion-mcp/
 │   │   ├── parser.go    # Content parser
 │   │   └── markdown.go  # Markdown conversion
 │   ├── server/          # MCP server
-│   │   ├── server.go    # Server main logic
-│   ├── tools/           # Tool execution
+│   │   └── server.go    # Server main logic
+│   ├── tools/           # Tool execution (planned)
 │   │   ├── executor.go  # Code executor
 │   │   └── registry.go  # Tool registry
 │   └── transport/       # Transport layer
@@ -219,10 +200,8 @@ go run main.go serve
 
 ## Security Considerations
 
-- **Language allowlist**: Only configured languages can be executed
-- **Timeout limits**: Code execution is limited to 30 seconds by default
-- **Isolated execution**: Consider running in a sandboxed environment for production
 - **API key security**: Never commit your `.env` file or expose API keys
+- **Cache security**: Cache directory should be properly permissioned
 
 ## Troubleshooting
 
@@ -233,14 +212,9 @@ go run main.go serve
 - Check that your Notion integration has access to the database
 - Review logs with `LOG_LEVEL=debug`
 
-**Tools not appearing**
-- Ensure database entries have `Type` set to `tool`
-- Verify entries contain code blocks
-- Check that code block language is in `EXEC_LANGUAGES`
-
-**Rate limiting errors**
-- Increase `CACHE_TTL` to reduce API calls
-- The server automatically retries with exponential backoff
+**Prompts/Resources not appearing**
+- Ensure database entries have `Type` set to `prompt` or `resource`
+- Check that the Type field name matches `NOTION_TYPE_FIELD` config
 
 ## Contributing
 
