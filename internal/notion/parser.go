@@ -89,7 +89,7 @@ func getMapString(m map[string]any, key string) string {
 func GetTypeFromProperties(properties map[string]Property, typeField string) string {
 	for name, prop := range properties {
 		if name == typeField {
-			if prop.Type == PropertyTypeSelect {
+			if prop.Type == PropertyTypeSelect && prop.Select != nil {
 				return prop.Select.Name
 			}
 		}
