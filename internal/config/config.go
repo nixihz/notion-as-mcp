@@ -39,7 +39,7 @@ const (
 	defaultTypeField   = "Type"
 	defaultCacheTTL    = 5 * time.Minute
 	defaultCacheDir    = "~/.cache/notion-mcp"
-	defaultLogLevel    = "info"
+	defaultLogLevel    = "warn"
 	defaultExecTimeout = 30 * time.Second
 	defaultExecLang    = "bash,python,js,javascript,ts,typescript"
 	defaultPollInt     = 60 * time.Second

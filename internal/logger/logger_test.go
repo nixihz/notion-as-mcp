@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/nixihz/notion-as-mcp/internal/config"
 )
@@ -413,23 +412,8 @@ func BenchmarkConcurrentLogging(b *testing.B) {
 }
 
 func TestLogFileCreation(t *testing.T) {
-	// Create a temporary directory for testing logs
-	tempDir := t.TempDir()
-
 	// Reset the once for testing
 	once = *new(sync.Once)
-
-	// Override the log directory for this test
-	origLogDir := "logs"
-	defer func() {
-		// Clean up the logs directory if it was created in the original location
-		os.RemoveAll(origLogDir)
-	}()
-
-	// Change to temp directory for the test
-	origWd, _ := os.Getwd()
-	os.Chdir(tempDir)
-	defer os.Chdir(origWd)
 
 	cfg := &config.Config{
 		LogLevel: "info",
@@ -444,9 +428,12 @@ func TestLogFileCreation(t *testing.T) {
 		t.Error("Init() did not set defaultLogger")
 	}
 
-	// Verify log file was created
-	currentDate := time.Now().Format("20060102")
-	expectedLogPath := filepath.Join("logs", currentDate+".log")
+	// Verify log file was created at $HOME/.mcp/notion-as-mcp.log
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("Failed to get home directory: %v", err)
+	}
+	expectedLogPath := filepath.Join(homeDir, ".mcp", "notion-as-mcp.log")
 
 	if _, err := os.Stat(expectedLogPath); os.IsNotExist(err) {
 		t.Errorf("Log file was not created at %s", expectedLogPath)

@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
 
 	"github.com/nixihz/notion-as-mcp/internal/config"
 )
@@ -43,16 +42,20 @@ func Init(cfg *config.Config) error {
 			Level: level,
 		}
 
-		// Create logs directory and log file
-		logDir := "logs"
+		// Create .mcp directory in user's home directory
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			initErr = fmt.Errorf("failed to get home directory: %w", err)
+			return
+		}
+		logDir := filepath.Join(homeDir, ".mcp")
 		if err := os.MkdirAll(logDir, 0755); err != nil {
-			initErr = fmt.Errorf("failed to create logs directory: %w", err)
+			initErr = fmt.Errorf("failed to create .mcp directory: %w", err)
 			return
 		}
 
-		// Generate log filename with current date (YYYYMMDD.log)
-		currentDate := time.Now().Format("20060102")
-		logFilePath := filepath.Join(logDir, fmt.Sprintf("%s.log", currentDate))
+		// Use fixed log filename
+		logFilePath := filepath.Join(logDir, "notion-as-mcp.log")
 
 		// Open log file in append mode, create if not exists
 		file, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
