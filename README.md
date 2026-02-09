@@ -1,256 +1,220 @@
 # Notion as MCP Server
 
-Dynamically generate MCP Prompts/Resources from Notion databases.
+[![Go](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![MCP](https://img.shields.io/badge/MCP-Compatible-blue)](https://modelcontextprotocol.io)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A server that uses Notion databases as MCP (Model Context Protocol) data sources.
-
-## Overview
-
-Notion-as-MCP transforms your Notion databases into a powerful MCP server, allowing you to:
-
-- **Manage prompts** directly in Notion and use them in MCP clients
-- **Store resources** as documentation or reference materials
-
-All content is automatically synced from your Notion database, with intelligent caching to minimize API calls.
+Turn your Notion databases into a dynamic MCP (Model Context Protocol) server — manage **prompts** and **resources** directly in Notion and use them in any MCP client.
 
 ## Features
 
-- **Prompts**: Extract and serve prompt-type entries from Notion
-- **Resources**: Extract and serve resource-type entries from Notion
-- **Two-layer caching**: Memory cache (5 minutes) + file cache (1 hour) for optimal performance
-- **Type filtering**: Automatically distinguishes types through configurable database fields
+- **Prompts** — Serve prompt templates from Notion pages
+- **Resources** — Serve documentation and reference materials
+- **Two-layer caching** — Memory (5 min) + file (1 hour) for minimal API calls
+- **Dual transport** — Streamable HTTP (SSE) for remote, stdio for local
+- **Docker ready** — Multi-stage build with non-root user
+- **Auto-sync** — Configurable polling interval to detect Notion changes
 
 ## Roadmap
 
-Future features planned:
-
-- **Tools**: Extract tool-type entries from Notion and execute code blocks (bash, python, javascript)
-- **Code execution**: Configurable language allowlists and timeout limits
-- **Rate limiting**: Built-in exponential backoff for Notion API rate limits
+- **Tools** — Execute code blocks (bash, python, js) defined in Notion pages (code scaffolding in place, not yet wired up)
 
 ## Quick Start
 
 ### Prerequisites
 
-- Go 1.24+ (for building from source)
-- A Notion account with API access
-- A Notion database configured with a `Type` field
+- Go 1.24+ (for building from source), or Docker
+- A [Notion Integration](https://www.notion.so/my-integrations) with API token
+- A Notion database with a `Type` select property (`prompt` / `resource`)
 
-### Installation
+### Install
 
-Choose one of the following installation methods:
-
-#### Method 1: Using `go install` (Recommended)
-
-Install directly from the repository:
+**go install** (recommended):
 
 ```bash
 go install github.com/nixihz/notion-as-mcp@latest
 ```
 
-The binary will be installed to `$GOPATH/bin` (or `$HOME/go/bin` by default). Make sure this directory is in your `PATH`:
+**Build from source**:
 
 ```bash
-# Add to your ~/.bashrc, ~/.zshrc, or equivalent
-export PATH=$PATH:$(go env GOPATH)/bin
+git clone https://github.com/nixihz/notion-as-mcp.git
+cd notion-as-mcp
+go build -o notion-as-mcp main.go
 ```
 
-#### Method 2: Build from Source
+### Configure & Run
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/nixihz/notion-as-mcp.git
-   cd notion-as-mcp
-   ```
+```bash
+cp .env.example .env
+# Edit .env with your NOTION_API_KEY and NOTION_DATABASE_ID
 
-2. **Build the binary**:
-   ```bash
-   go build -o notion-as-mcp main.go
-   ```
+# Streamable HTTP (default, port 3100)
+notion-as-mcp serve
 
-3. **(Optional) Install to system**:
-   ```bash
-   sudo mv notion-as-mcp /usr/local/bin/
-   ```
-
-### Configuration
-
-1. **Configure environment variables**:
-   ```bash
-   # Create .env file in your working directory
-   cp .env.example .env
-   # Edit .env with your Notion credentials
-   ```
-
-2. **Run the server**:
-   ```bash
-   notion-as-mcp serve
-   ```
+# stdio mode (for Claude Desktop / local clients)
+notion-as-mcp serve --transport stdio
+```
 
 ## Configuration
 
-### Environment Variables
+All configuration via environment variables or `.env` file:
 
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `NOTION_API_KEY` | Notion Integration Token | - | ✅ |
-| `NOTION_DATABASE_ID` | Notion Database ID | - | ✅ |
-| `NOTION_TYPE_FIELD` | Type field name in database | `Type` | ❌ |
-| `CACHE_TTL` | Cache time-to-live | `5m` | ❌ |
-| `CACHE_DIR` | Cache directory path | `~/.cache/notion-as-mcp` | ❌ |
-| `LOG_LEVEL` | Logging level (debug/info/warn/error) | `info` | ❌ |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NOTION_API_KEY` | Notion Integration Token | **(required)** |
+| `NOTION_DATABASE_ID` | Notion Database ID | **(required)** |
+| `NOTION_TYPE_FIELD` | Type property name in database | `Type` |
+| `TRANSPORT_TYPE` | `streamable` or `stdio` | `streamable` |
+| `SERVER_HOST` | Listen address (streamable mode) | `0.0.0.0` |
+| `SERVER_PORT` | Listen port (streamable mode) | `3100` |
+| `CACHE_TTL` | Cache time-to-live | `5m` |
+| `CACHE_DIR` | Cache directory path | `~/.cache/notion-as-mcp` |
+| `POLL_INTERVAL` | Notion change polling interval (`0` to disable) | `60s` |
+| `REFRESH_ON_START` | Refresh data on server start | `true` |
+| `EXEC_TIMEOUT` | Code execution timeout (planned) | `30s` |
+| `EXEC_LANGUAGES` | Allowed languages, comma-separated (planned) | `bash,python,js` |
+| `LOG_LEVEL` | `debug` / `info` / `warn` / `error` | `info` |
 
-### Setting Up Notion
+CLI flags (`--host`, `--port`, `--transport`) override environment variables.
 
-1. **Create a Notion Integration**:
-   - Go to https://www.notion.so/my-integrations
-   - Create a new integration
-   - Copy the Integration Token
+## Setting Up Notion
 
-2. **Prepare Your Database**:
-   - Create or select a Notion database
-   - Add a `Select` property named `Type` (or your custom name)
-   - Add options: `prompt`, `resource`
-   - Add a `Text` property named `Description` for entry descriptions
-   - Share the database with your integration
+1. **Create Integration** — Go to [My Integrations](https://www.notion.so/my-integrations), create one, and copy the token.
 
-3. **Get Database ID**:
-   - Open your database in Notion
-   - Copy the ID from the URL (the part after the last `/` and before `?`)
+2. **Prepare Database** — Add these properties:
+   - `Type` — Select property with options: `prompt`, `resource`
+   - `Description` — Text property (optional but recommended)
 
-## Notion Database Structure
+3. **Share Database** — Invite your integration to the database via the "..." menu → "Connections".
 
-### Required Properties
-
-Your Notion database must have:
-
-1. **Name property**: The title of each entry (standard Notion property)
-2. **Type property**: A `Select` type field with these options:
-   - `prompt` - MCP prompt entries
-   - `resource` - MCP resource entries
-3. **Description property**: A `Text` type field for entry descriptions (optional but recommended)
+4. **Get Database ID** — From the database URL: `https://notion.so/{workspace}/{DATABASE_ID}?v=...`
 
 ### Example Database
 
 | Name | Type | Description |
 |------|------|-------------|
-| Code Review Prompt | prompt | A helpful prompt for reviewing code quality and best practices |
-| API Documentation | resource | Complete API reference documentation |
+| Code Review Prompt | prompt | Prompt for reviewing code quality |
+| API Documentation | resource | Complete API reference |
 
-### Entry Formats
+### Entry Content
 
-#### Prompt Entry
-Simply add text content to the page. The entire page content will be used as the prompt.
+- **Prompt**: Page content becomes the prompt template
+- **Resource**: Page content served as documentation
 
-#### Resource Entry
-Add any documentation or reference material. The content will be served as a resource.
+## MCP Client Integration
 
-## Usage
+### Claude Desktop
 
-### Claude Desktop Integration
-
-Add the server to your Claude Desktop configuration at `~/.config/claude-desktop/claude_desktop_config.json`:
+Add to `~/.config/claude-desktop/claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "notion": {
-      "command": "/absolute/path/to/notion-as-mcp",
-      "args": ["serve"]
+      "command": "/path/to/notion-as-mcp",
+      "args": ["serve", "--transport", "stdio"],
+      "env": {
+        "NOTION_API_KEY": "ntn_xxx",
+        "NOTION_DATABASE_ID": "your-database-id"
+      }
     }
   }
 }
 ```
 
-Restart Claude Desktop to load the server.
+### Remote (Streamable HTTP)
 
-### MCP Protocol Endpoints
+Start the server, then connect your MCP client to `http://host:3100/mcp`.
 
-The server implements the following MCP endpoints:
+## Docker
 
-- **`prompts/list`** - List all available prompts
-- **`prompts/get`** - Get a specific prompt by name
-- **`resources/list`** - List all available resources
-- **`resources/read`** - Read resource content by URI
+```bash
+# Build
+docker build -t notion-as-mcp .
+
+# Run (streamable, default)
+docker run -d --name notion-as-mcp \
+  -p 3100:3100 \
+  -e NOTION_API_KEY=ntn_xxx \
+  -e NOTION_DATABASE_ID=your-db-id \
+  notion-as-mcp
+
+# Run (stdio)
+docker run --rm -i \
+  -e NOTION_API_KEY=ntn_xxx \
+  -e NOTION_DATABASE_ID=your-db-id \
+  -e TRANSPORT_TYPE=stdio \
+  notion-as-mcp
+```
+
+## Development
+
+Uses [Task](https://taskfile.dev) for common operations:
+
+```bash
+task serve          # Run with streamable transport (default)
+task serve:stdio    # Run with stdio transport
+task build          # Build binary
+task docker:build   # Build Docker image
+task docker:run     # Run Docker container
+```
+
+Or directly:
+
+```bash
+go run main.go serve          # Dev run
+go test ./...                 # Tests
+golangci-lint run             # Lint
+```
+
+## MCP Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `prompts/list` | List available prompts |
+| `prompts/get` | Get prompt content by name |
+| `resources/list` | List available resources |
+| `resources/read` | Read resource content by URI |
 
 ## Project Structure
 
 ```
 notion-as-mcp/
 ├── cmd/
-│   ├── root.go          # Cobra root command
-│   └── serve.go         # serve subcommand
+│   ├── root.go              # Cobra root command
+│   └── serve.go             # serve subcommand
 ├── internal/
-│   ├── cache/           # Cache implementation
-│   │   ├── cache.go     # Cache interface
-│   │   ├── memory.go    # Memory cache
-│   │   ├── file.go      # File cache
-│   │   └── layered.go   # Two-layer cache
-│   ├── config/          # Configuration loading
-│   │   └── config.go
-│   ├── logger/          # Logging
-│   │   └── logger.go
-│   ├── notion/          # Notion API client
-│   │   ├── client.go    # API client
-│   │   ├── models.go    # Data models
-│   │   ├── parser.go    # Content parser
-│   │   └── markdown.go  # Markdown conversion
-│   ├── server/          # MCP server
-│   │   └── server.go    # Server main logic
-│   ├── tools/           # Tool execution (planned)
-│   │   ├── executor.go  # Code executor
-│   │   └── registry.go  # Tool registry
-│   └── transport/       # Transport layer
-│       └── stdio.go     # stdio transport
-├── main.go              # Entry point
-├── LICENSE              # MIT License
-└── .env.example        # Example configuration
+│   ├── cache/               # Memory + file two-layer cache
+│   ├── config/              # Configuration loading
+│   ├── logger/              # slog-based logging
+│   ├── notion/              # Notion API client & parser
+│   ├── server/              # MCP server implementation
+│   └── tools/               # Code execution engine
+├── main.go
+├── Dockerfile
+├── Taskfile.yml
+└── .env.example
 ```
 
-## Development
+## Security
 
-### Running Tests
-
-```bash
-go test ./...
-```
-
-### Code Linting
-
-```bash
-golangci-lint run
-```
-
-### Development Mode
-
-```bash
-go run main.go serve
-```
-
-## Security Considerations
-
-- **API key security**: Never commit your `.env` file or expose API keys
-- **Cache security**: Cache directory should be properly permissioned
+- **API keys**: Never commit `.env` — use environment variables in production
+- **Code execution** (planned): Will be sandboxed by language allowlist and timeout
+- **Docker**: Runs as non-root user with minimal Alpine image
 
 ## Troubleshooting
 
-### Common Issues
-
-**Server won't start**
-- Verify `NOTION_API_KEY` and `NOTION_DATABASE_ID` are set correctly
-- Check that your Notion integration has access to the database
-- Review logs with `LOG_LEVEL=debug`
-
-**Prompts/Resources not appearing**
-- Ensure database entries have `Type` set to `prompt` or `resource`
-- Check that the Type field name matches `NOTION_TYPE_FIELD` config
+| Problem | Solution |
+|---------|----------|
+| Server won't start | Verify `NOTION_API_KEY` and `NOTION_DATABASE_ID`; check integration has database access |
+| Entries not appearing | Ensure `Type` is set to `prompt`/`resource`; verify `NOTION_TYPE_FIELD` matches |
+| Stale data | Lower `POLL_INTERVAL` or restart server; check `CACHE_TTL` |
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions welcome! Please submit a Pull Request.
 
 ## License
 
-MIT
-
-See [LICENSE](LICENSE) for details.
+[MIT](LICENSE)
