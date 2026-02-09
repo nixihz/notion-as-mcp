@@ -10,7 +10,7 @@ import (
 // Root returns the root command.
 func Root() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "notion-mcp",
+		Use:   "notion-as-mcp",
 		Short: "Notion MCP Server - A Model Context Protocol server for Notion",
 		Long: `Notion MCP Server is a CLI tool that provides MCP (Model Context Protocol)
 access to Notion databases, exposing prompts, resources, and tools based on
@@ -43,19 +43,19 @@ func completionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "completion [bash|zsh|fish]",
 		Short: "Generate shell completion script",
-		Long: `Generate shell completion script for notion-mcp.
+		Long: `Generate shell completion script for notion-as-mcp.
 
 To load completions:
 
 Bash:
 
-  $ source <(notion-mcp completion bash)
+  $ source <(notion-as-mcp completion bash)
 
   # To load completions for each session, execute once:
   # Linux:
-  $ notion-mcp completion bash > /etc/bash_completion.d/notion-mcp
+  $ notion-as-mcp completion bash > /etc/bash_completion.d/notion-as-mcp
   # macOS:
-  $ notion-mcp completion bash > /usr/local/etc/bash_completion.d/notion-mcp
+  $ notion-as-mcp completion bash > /usr/local/etc/bash_completion.d/notion-as-mcp
 
 Zsh:
 
@@ -65,16 +65,16 @@ Zsh:
   $ echo "autoload -U compinit; compinit" >> ~/.zshrc
 
   # To load completions for each session, execute once:
-  $ notion-mcp completion zsh > "${fpath[1]}/_notion-mcp"
+  $ notion-as-mcp completion zsh > "${fpath[1]}/_notion-as-mcp"
 
   # You will need to start a new shell for this setup to take effect.
 
 Fish:
 
-  $ notion-mcp completion fish | source
+  $ notion-as-mcp completion fish | source
 
   # To load completions for each session, execute once:
-  $ notion-mcp completion fish > ~/.config/fish/completions/notion-mcp.fish
+  $ notion-as-mcp completion fish > ~/.config/fish/completions/notion-as-mcp.fish
 `,
 		DisableFlagsInUseLine: true,
 		ValidArgs:             []string{"bash", "zsh", "fish"},

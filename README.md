@@ -65,12 +65,12 @@ export PATH=$PATH:$(go env GOPATH)/bin
 
 2. **Build the binary**:
    ```bash
-   go build -o notion-mcp main.go
+   go build -o notion-as-mcp main.go
    ```
 
 3. **(Optional) Install to system**:
    ```bash
-   sudo mv notion-mcp /usr/local/bin/
+   sudo mv notion-as-mcp /usr/local/bin/
    ```
 
 ### Configuration
@@ -84,7 +84,7 @@ export PATH=$PATH:$(go env GOPATH)/bin
 
 2. **Run the server**:
    ```bash
-   notion-mcp serve
+   notion-as-mcp serve
    ```
 
 ## Configuration
@@ -97,7 +97,7 @@ export PATH=$PATH:$(go env GOPATH)/bin
 | `NOTION_DATABASE_ID` | Notion Database ID | - | ✅ |
 | `NOTION_TYPE_FIELD` | Type field name in database | `Type` | ❌ |
 | `CACHE_TTL` | Cache time-to-live | `5m` | ❌ |
-| `CACHE_DIR` | Cache directory path | `~/.cache/notion-mcp` | ❌ |
+| `CACHE_DIR` | Cache directory path | `~/.cache/notion-as-mcp` | ❌ |
 | `LOG_LEVEL` | Logging level (debug/info/warn/error) | `info` | ❌ |
 
 ### Setting Up Notion
@@ -155,7 +155,7 @@ Add the server to your Claude Desktop configuration at `~/.config/claude-desktop
 {
   "mcpServers": {
     "notion": {
-      "command": "/absolute/path/to/notion-mcp",
+      "command": "/absolute/path/to/notion-as-mcp",
       "args": ["serve"]
     }
   }
@@ -176,7 +176,7 @@ The server implements the following MCP endpoints:
 ## Project Structure
 
 ```
-notion-mcp/
+notion-as-mcp/
 ├── cmd/
 │   ├── root.go          # Cobra root command
 │   └── serve.go         # serve subcommand

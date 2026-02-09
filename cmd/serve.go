@@ -19,12 +19,18 @@ import (
 
 // serveCmd returns the serve command.
 func serveCmd() *cobra.Command {
+	var (
+		host      string
+		port      int
+		transport string
+	)
+
 	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "Start the MCP server",
 		Long: `Start the Notion MCP server.
 
-The server will listen for MCP protocol messages over stdio
+The server will listen for MCP protocol messages over stdio or streamable HTTP
 and communicate with Notion to provide prompts, resources,
 and tools based on your Notion database.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -35,6 +41,17 @@ and tools based on your Notion database.`,
 			}
 			if err := cfg.Validate(); err != nil {
 				return fmt.Errorf("validate config: %w", err)
+			}
+
+			// Override config with CLI flags if provided
+			if host != "" {
+				cfg.ServerHost = host
+			}
+			if port != 0 {
+				cfg.ServerPort = port
+			}
+			if transport != "" {
+				cfg.TransportType = transport
 			}
 
 			// Create server (initializes logger internally)
@@ -75,6 +92,11 @@ and tools based on your Notion database.`,
 			return nil
 		},
 	}
+
+	// Add flags
+	cmd.Flags().StringVar(&host, "host", "", "Server host address (default: 0.0.0.0)")
+	cmd.Flags().IntVarP(&port, "port", "p", 0, "Server port (default: 3100)")
+	cmd.Flags().StringVarP(&transport, "transport", "t", "", "Transport type: streamable or stdio (default: streamable)")
 
 	return cmd
 }

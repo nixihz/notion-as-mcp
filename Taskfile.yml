@@ -3,7 +3,11 @@
 version: '3'
 
 vars:
-  GREETING: Hello, World!
+  PORT: 3100
+  NOTION_DATABASE_ID: 
+    sh: echo $NOTION_DATABASE_ID
+  NOTION_API_KEY: 
+    sh: echo $NOTION_API_KEY
 
 tasks:
   default:
@@ -15,7 +19,33 @@ tasks:
     cmds:
       - go build -o notion-as-mcp main.go
 
-  serve:
-    desc: "Run the application"
+  docker:build:
+    desc: "Build Docker image"
     cmds:
-      - go run main.go serve
+      - docker build -t notion-as-mcp .
+
+  docker:run:
+    desc: "Run Docker container with streamable transport"
+    cmds:
+      - docker rm -f notion-as-mcp || true
+      - docker run -d --name notion-as-mcp --rm -p {{.PORT}}:8080 -e NOTION_API_KEY={{.NOTION_API_KEY}} -e NOTION_DATABASE_ID={{.NOTION_DATABASE_ID}} notion-as-mcp serve --port 8080
+
+  docker:run:stdio:
+    desc: "Run Docker container with stdio transport"
+    cmds:
+      - docker run --rm -e NOTION_API_KEY={{.NOTION_API_KEY}} -e NOTION_DATABASE_ID={{.NOTION_DATABASE_ID}} -e TRANSPORT_TYPE=stdio notion-as-mcp serve
+
+  serve:
+    desc: "Run the application (default: streamable)"
+    cmds:
+      - go run main.go serve --transport streamable --port {{.PORT}}
+
+  serve:stdio:
+    desc: "Run the application with stdio transport"
+    cmds:
+      - go run main.go serve --transport stdio
+
+  serve:sse:
+    desc: "Run the application with streamable transport"
+    cmds:
+      - go run main.go serve --transport streamable --port {{.PORT}}

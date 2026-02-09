@@ -65,8 +65,9 @@ func Init(cfg *config.Config) error {
 		}
 		logFile = file
 
-		// Use JSON handler for structured logging (output to file only)
-		defaultLogger = slog.New(slog.NewJSONHandler(logFile, handlerOptions))
+		// Use JSON handler for structured logging (output to both file and stderr)
+		multiWriter := io.MultiWriter(logFile, os.Stderr)
+		defaultLogger = slog.New(slog.NewTextHandler(multiWriter, handlerOptions))
 		slog.SetDefault(defaultLogger)
 	})
 	return initErr

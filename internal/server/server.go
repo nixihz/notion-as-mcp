@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"strings"
 
@@ -16,7 +17,6 @@ import (
 	"github.com/nixihz/notion-as-mcp/internal/logger"
 	"github.com/nixihz/notion-as-mcp/internal/notion"
 	"github.com/nixihz/notion-as-mcp/internal/tools"
-	"github.com/nixihz/notion-as-mcp/internal/transport"
 )
 
 // Server represents the MCP server.
@@ -61,7 +61,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		cache:  cacheStore,
 		logger: log,
 		impl: &mcp.Implementation{
-			Name:    "notion-mcp",
+			Name:    "notion-as-mcp",
 			Version: "1.0.0",
 		},
 		executor: tools.NewExecutor(cfg.ExecTimeout, cfg.ExecLanguages),
@@ -71,39 +71,71 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	return srv, nil
 }
 
-// Start starts the MCP server with stdio transport.
+// Start starts the MCP server with the configured transport.
 func (s *Server) Start(ctx context.Context) error {
-	s.logger.Info("starting Notion MCP server",
-		slog.String("database_id", s.cfg.NotionDatabaseID),
-		slog.String("type_field", s.cfg.NotionTypeField),
-	)
-
-	// Create stdio transport
-	stdioTransport := transport.NewStdioTransport()
-
-	// Create server
-	server := mcp.NewServer(s.impl, nil)
 	// Get all pages from Notion and filter by type
 	allPages, err := s.client.GetAllPages(context.Background())
 	if err != nil {
 		s.logger.Warn("failed to query pages", slog.String("error", err.Error()))
 	}
 
+	if s.cfg.TransportType == "streamable" {
+		return s.startStreamable(ctx, allPages)
+	}
+	return s.startStdio(ctx, allPages)
+}
+
+// startStreamable starts the MCP server with streamable HTTP transport.
+func (s *Server) startStreamable(ctx context.Context, allPages []notion.Page) error {
+	server := mcp.NewServer(s.impl, nil)
+
 	// Register handlers
 	s.registerPrompts(server, allPages)
 	s.registerResources(server, allPages)
-	// s.registerTools(server, allPages)
 
-	// Accept connection with transport
-	session, err := server.Connect(ctx, stdioTransport, nil)
-	if err != nil {
-		return fmt.Errorf("connect: %w", err)
+	handler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
+		return server
+	}, nil)
+
+	addr := fmt.Sprintf("%s:%d", s.cfg.ServerHost, s.cfg.ServerPort)
+	s.logger.Info("starting Notion MCP server with streamable transport",
+		slog.String("database_id", s.cfg.NotionDatabaseID),
+		slog.String("type_field", s.cfg.NotionTypeField),
+		slog.String("addr", addr),
+	)
+
+	// Start HTTP server in a goroutine
+	serverErr := make(chan error, 1)
+	go func() {
+		serverErr <- http.ListenAndServe(addr, handler)
+	}()
+
+	// Wait for HTTP server error or context cancellation
+	select {
+	case err := <-serverErr:
+		return fmt.Errorf("http server: %w", err)
+	case <-ctx.Done():
+		return ctx.Err()
 	}
+}
+
+// startStdio starts the MCP server with stdio transport.
+func (s *Server) startStdio(ctx context.Context, allPages []notion.Page) error {
+	s.logger.Info("starting Notion MCP server with stdio transport",
+		slog.String("database_id", s.cfg.NotionDatabaseID),
+		slog.String("type_field", s.cfg.NotionTypeField),
+	)
+
+	server := mcp.NewServer(s.impl, nil)
+
+	// Register handlers
+	s.registerPrompts(server, allPages)
+	s.registerResources(server, allPages)
 
 	s.logger.Info("Notion MCP server started")
 
-	// Wait for session to end
-	return session.Wait()
+	// Use SDK built-in StdioTransport with server.Run
+	return server.Run(ctx, &mcp.StdioTransport{})
 }
 
 // Stop stops the MCP server.

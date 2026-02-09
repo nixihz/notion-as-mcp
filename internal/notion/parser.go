@@ -33,6 +33,16 @@ func extractBlockText(block Block) string {
 		if ok {
 			return "```" + codeBlock.Language + "\n" + extractRichText(codeBlock.Code) + "\n```"
 		}
+	case BlockTypeToDo:
+		checked := false
+		if contentMap, ok := block.Content.(map[string]any); ok {
+			checked = getMapBool(contentMap, "checked")
+		}
+		text := extractRichText(block.Content)
+		if checked {
+			return "- [x] " + text
+		}
+		return "- [ ] " + text
 	case BlockTypeQuote:
 		return "> " + extractRichText(block.Content)
 	case BlockTypeDivider:

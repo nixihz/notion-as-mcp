@@ -6,6 +6,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -32,18 +33,26 @@ type Config struct {
 	// Change detection configuration
 	PollInterval   time.Duration `json:"poll_interval"`
 	RefreshOnStart bool          `json:"refresh_on_start"`
+
+	// Server configuration
+	ServerHost    string `json:"server_host"`
+	ServerPort    int    `json:"server_port"`
+	TransportType string `json:"transport_type"`
 }
 
 // Default values.
 const (
 	defaultTypeField   = "Type"
 	defaultCacheTTL    = 5 * time.Minute
-	defaultCacheDir    = "~/.cache/notion-mcp"
-	defaultLogLevel    = "warn"
+	defaultCacheDir    = "~/.cache/notion-as-mcp"
+	defaultLogLevel    = "info"
 	defaultExecTimeout = 30 * time.Second
 	defaultExecLang    = "bash,python,js,javascript,ts,typescript"
 	defaultPollInt     = 60 * time.Second
 	defaultRefreshOn   = true
+	defaultServerHost  = "0.0.0.0"
+	defaultServerPort  = 3100
+	defaultTransport   = "streamable"
 )
 
 // Load loads configuration from environment variables and .env file.
@@ -60,6 +69,9 @@ func Load() (*Config, error) {
 		ExecLanguages:   defaultExecLang,
 		PollInterval:    defaultPollInt,
 		RefreshOnStart:  defaultRefreshOn,
+		ServerHost:      defaultServerHost,
+		ServerPort:      defaultServerPort,
+		TransportType:   defaultTransport,
 	}
 
 	// Required: Notion API Key
@@ -126,6 +138,25 @@ func Load() (*Config, error) {
 	// Optional: Refresh on start
 	if ros := os.Getenv("REFRESH_ON_START"); ros != "" {
 		cfg.RefreshOnStart = ros == "true" || ros == "1"
+	}
+
+	// Optional: Server host
+	if sh := os.Getenv("SERVER_HOST"); sh != "" {
+		cfg.ServerHost = sh
+	}
+
+	// Optional: Server port
+	if sp := os.Getenv("SERVER_PORT"); sp != "" {
+		port, err := strconv.Atoi(sp)
+		if err != nil {
+			return nil, fmt.Errorf("invalid SERVER_PORT: %w", err)
+		}
+		cfg.ServerPort = port
+	}
+
+	// Optional: Transport type
+	if tt := os.Getenv("TRANSPORT_TYPE"); tt != "" {
+		cfg.TransportType = tt
 	}
 
 	return cfg, nil

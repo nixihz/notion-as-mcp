@@ -151,13 +151,56 @@ func (c *Client) GetPageContent(ctx context.Context, pageID string) (*PageConten
 	return pc, nil
 }
 
+// isRetryableError checks if the error is a transient network error worth retrying.
+func isRetryableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	// Retry on broken pipe, connection reset, EOF
+	for _, s := range []string{"broken pipe", "connection reset", "EOF", "use of closed network connection"} {
+		if contains(errStr, s) {
+			return true
+		}
+	}
+	return false
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && searchStr(s, substr)
+}
+
+func searchStr(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
 // doRequest performs an HTTP request with retry logic.
 func (c *Client) doRequest(ctx context.Context, method, url string, body io.Reader, response interface{}) error {
 	maxRetries := 3
 	backoff := time.Second
 
+	// Buffer the body so it can be re-read on retries
+	var bodyBytes []byte
+	if body != nil {
+		var err error
+		bodyBytes, err = io.ReadAll(body)
+		if err != nil {
+			return fmt.Errorf("read request body: %w", err)
+		}
+	}
+
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, method, url, body)
+		var reqBody io.Reader
+		if bodyBytes != nil {
+			reqBody = bytes.NewReader(bodyBytes)
+		}
+
+		req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
 		if err != nil {
 			return fmt.Errorf("create request: %w", err)
 		}
@@ -168,6 +211,17 @@ func (c *Client) doRequest(ctx context.Context, method, url string, body io.Read
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
+			// Retry on transient network errors (broken pipe, connection reset, etc.)
+			if isRetryableError(err) && attempt < maxRetries-1 {
+				slog.Warn("retrying request due to network error",
+					"attempt", attempt+1,
+					"error", err.Error(),
+					"url", url,
+				)
+				time.Sleep(backoff)
+				backoff *= 2
+				continue
+			}
 			return fmt.Errorf("request failed: %w", err)
 		}
 		defer resp.Body.Close()
@@ -196,16 +250,15 @@ func (c *Client) doRequest(ctx context.Context, method, url string, body io.Read
 			return fmt.Errorf("notion API error: %s (%s)", errResp.Message, errResp.Code)
 		}
 		// Read response body for decoding
-		body, err := io.ReadAll(resp.Body)
+		respBody, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("read response body: %w", err)
 		}
-		resp.Body = io.NopCloser(bytes.NewReader(body))
 		// Debug log for API response (only in debug mode)
-		slog.Debug("notion API response", "status", resp.StatusCode, "body_size", len(body))
+		slog.Debug("notion API response", "status", resp.StatusCode, "body_size", len(respBody))
 
 		if response != nil {
-			if err := json.NewDecoder(resp.Body).Decode(response); err != nil {
+			if err := json.Unmarshal(respBody, response); err != nil {
 				return fmt.Errorf("decode response: %w", err)
 			}
 		}

@@ -57,7 +57,7 @@ type cacheOptions struct {
 func NewCache(opts ...CacheOption) (Cache, error) {
 	o := &cacheOptions{
 		DefaultTTL: 5 * time.Minute,
-		Directory:  "~/.cache/notion-mcp",
+		Directory:  "~/.cache/notion-as-mcp",
 	}
 	for _, opt := range opts {
 		opt(o)

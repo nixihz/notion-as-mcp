@@ -165,6 +165,8 @@ const (
 	BlockTypeDivider          BlockType = "divider"
 	BlockTypeCallout          BlockType = "callout"
 	BlockTypeImage            BlockType = "image"
+	BlockTypeToDo             BlockType = "to_do"
+	BlockTypeToggle           BlockType = "toggle"
 )
 
 // CodeBlock represents a code block content.

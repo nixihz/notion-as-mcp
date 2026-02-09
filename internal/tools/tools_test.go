@@ -72,7 +72,7 @@ func TestExecutorExecute(t *testing.T) {
 	t.Run("Bash execution", func(t *testing.T) {
 		e := NewExecutor(5*time.Second, "bash")
 
-		result, err := e.Execute(ctx, "bash", `echo "Hello, World!"`)
+		result, err := e.Execute(ctx, "bash", `echo "Hello, World!"`, nil)
 		if err != nil {
 			t.Fatalf("Execute() failed: %v", err)
 		}
@@ -88,7 +88,7 @@ func TestExecutorExecute(t *testing.T) {
 	t.Run("Bash with error", func(t *testing.T) {
 		e := NewExecutor(5*time.Second, "bash")
 
-		result, err := e.Execute(ctx, "bash", "exit 42")
+		result, err := e.Execute(ctx, "bash", "exit 42", nil)
 		if err != nil {
 			t.Fatalf("Execute() failed: %v", err)
 		}
@@ -101,7 +101,7 @@ func TestExecutorExecute(t *testing.T) {
 	t.Run("Python execution", func(t *testing.T) {
 		e := NewExecutor(5*time.Second, "python")
 
-		result, err := e.Execute(ctx, "python", "print('Hello from Python')")
+		result, err := e.Execute(ctx, "python", "print('Hello from Python')", nil)
 		if err != nil {
 			t.Fatalf("Execute() failed: %v", err)
 		}
@@ -117,7 +117,7 @@ func TestExecutorExecute(t *testing.T) {
 	t.Run("JavaScript execution", func(t *testing.T) {
 		e := NewExecutor(5*time.Second, "js")
 
-		result, err := e.Execute(ctx, "js", "console.log('Hello from JS')")
+		result, err := e.Execute(ctx, "js", "console.log('Hello from JS')", nil)
 		if err != nil {
 			t.Fatalf("Execute() failed: %v", err)
 		}
@@ -134,7 +134,7 @@ func TestExecutorExecute(t *testing.T) {
 	t.Run("Language not allowed", func(t *testing.T) {
 		e := NewExecutor(5*time.Second, "bash")
 
-		_, err := e.Execute(ctx, "python", "print('test')")
+		_, err := e.Execute(ctx, "python", "print('test')", nil)
 		if err == nil {
 			t.Error("Execute() with disallowed language should return error")
 		}
@@ -143,7 +143,7 @@ func TestExecutorExecute(t *testing.T) {
 	t.Run("Unsupported language", func(t *testing.T) {
 		e := NewExecutor(5*time.Second, "ruby")
 
-		_, err := e.Execute(ctx, "ruby", "puts 'test'")
+		_, err := e.Execute(ctx, "ruby", "puts 'test'", nil)
 		if err == nil {
 			t.Error("Execute() with unsupported language should return error")
 		}
@@ -153,7 +153,7 @@ func TestExecutorExecute(t *testing.T) {
 		e := NewExecutor(100*time.Millisecond, "bash")
 
 		// This should timeout
-		result, err := e.Execute(ctx, "bash", "sleep 10")
+		result, err := e.Execute(ctx, "bash", "sleep 10", nil)
 		if err != nil {
 			// Timeout is expected
 			if result.Error == "" {
@@ -165,7 +165,7 @@ func TestExecutorExecute(t *testing.T) {
 	t.Run("Sh alias for bash", func(t *testing.T) {
 		e := NewExecutor(5*time.Second, "sh")
 
-		result, err := e.Execute(ctx, "sh", `echo "sh test"`)
+		result, err := e.Execute(ctx, "sh", `echo "sh test"`, nil)
 		if err != nil {
 			t.Fatalf("Execute() failed: %v", err)
 		}
@@ -178,7 +178,7 @@ func TestExecutorExecute(t *testing.T) {
 	t.Run("Py alias for python", func(t *testing.T) {
 		e := NewExecutor(5*time.Second, "py")
 
-		result, err := e.Execute(ctx, "py", "print('py test')")
+		result, err := e.Execute(ctx, "py", "print('py test')", nil)
 		if err != nil {
 			t.Fatalf("Execute() failed: %v", err)
 		}
@@ -370,7 +370,7 @@ func BenchmarkExecutorExecuteBash(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		e.Execute(ctx, "bash", `echo "benchmark"`)
+		e.Execute(ctx, "bash", `echo "benchmark"`, nil)
 	}
 }
 

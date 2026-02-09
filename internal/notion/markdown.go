@@ -147,9 +147,13 @@ func (c *MarkdownConverter) RenderCode(block Block) {
 		}
 	}
 
-	// Extract code text
+	// Extract code text: prefer RichText (Notion API field), fallback to Code
+	richTexts := codeBlock.RichText
+	if len(richTexts) == 0 {
+		richTexts = codeBlock.Code
+	}
 	var codeText strings.Builder
-	for _, rt := range codeBlock.Code {
+	for _, rt := range richTexts {
 		codeText.WriteString(rt.PlainText)
 	}
 
@@ -190,6 +194,28 @@ func (c *MarkdownConverter) RenderQuote(block Block) {
 func (c *MarkdownConverter) RenderDivider(block Block) {
 	c.WriteString("---")
 	c.Newline()
+}
+
+// RenderToDo renders a to_do block as a markdown checkbox.
+func (c *MarkdownConverter) RenderToDo(block Block) {
+	checked := false
+	if contentMap, ok := block.Content.(map[string]any); ok {
+		checked = getMapBool(contentMap, "checked")
+	}
+	richTexts := c.extractRichTexts(block.Content)
+	if len(richTexts) == 0 {
+		return
+	}
+	text := c.RenderRichText(richTexts)
+	if text == "" {
+		return
+	}
+	if checked {
+		c.WriteString("- [x] " + text)
+	} else {
+		c.WriteString("- [ ] " + text)
+	}
+	c.Eol()
 }
 
 // RenderCallout renders a callout block.
@@ -340,6 +366,8 @@ func (c *MarkdownConverter) RenderBlock(block Block, numberedListIndex *int) {
 		c.RenderQuote(block)
 	case BlockTypeDivider:
 		c.RenderDivider(block)
+	case BlockTypeToDo:
+		c.RenderToDo(block)
 	case BlockTypeCallout:
 		c.RenderCallout(block)
 	case BlockTypeImage:

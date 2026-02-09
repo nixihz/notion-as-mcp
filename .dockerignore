@@ -1,0 +1,47 @@
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+LICENSE
+docs/
+
+# CI/CD
+.github/
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Tests
+*_test.go
+tests/
+test/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.o
+*.a
+*.so
+notion-as-mcp
+
+# Coverage
+coverage.out
+coverage.html
