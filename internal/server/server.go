@@ -103,14 +103,31 @@ func (s *Server) Start(ctx context.Context) error {
 
 // getAllPagesWithCache tries to get pages from cache first, falls back to Notion.
 func (s *Server) getAllPagesWithCache(ctx context.Context) []notion.Page {
-	// Try cache first
-	cachedData, err := s.mcpCache.Get(ctx, cache.CacheKeyResources)
-	if err == nil && cachedData != nil {
-		var pages []notion.Page
-		if json.Unmarshal(cachedData, &pages) == nil {
-			s.logger.Info("using cached pages for resources")
-			return pages
+	// Try to get pages from both caches (resources and prompts)
+	// and merge them to get all pages
+	var allPages []notion.Page
+
+	// Try resources cache
+	resourceData, err := s.mcpCache.Get(ctx, cache.CacheKeyResources)
+	if err == nil && resourceData != nil {
+		var resourcePages []notion.Page
+		if json.Unmarshal(resourceData, &resourcePages) == nil {
+			allPages = append(allPages, resourcePages...)
 		}
+	}
+
+	// Try prompts cache
+	promptData, err := s.mcpCache.Get(ctx, cache.CacheKeyPrompts)
+	if err == nil && promptData != nil {
+		var promptPages []notion.Page
+		if json.Unmarshal(promptData, &promptPages) == nil {
+			allPages = append(allPages, promptPages...)
+		}
+	}
+
+	if len(allPages) > 0 {
+		s.logger.Info("using cached pages", slog.Int("total", len(allPages)))
+		return allPages
 	}
 
 	// Cache miss or error, fetch from Notion
@@ -120,6 +137,21 @@ func (s *Server) getAllPagesWithCache(ctx context.Context) []notion.Page {
 		s.logger.Warn("failed to query pages", slog.String("error", err.Error()))
 		return nil
 	}
+
+	// Debug: log page types
+	typeCounts := make(map[string]int)
+	for _, p := range pages {
+		pageType := notion.GetTypeFromProperties(p.Properties, s.cfg.NotionTypeField)
+		if pageType == "" {
+			pageType = "(empty)"
+		}
+		typeCounts[pageType]++
+	}
+	s.logger.Info("fetched pages from Notion",
+		slog.Int("total", len(pages)),
+		slog.Any("type_counts", typeCounts),
+	)
+
 	return pages
 }
 
@@ -168,8 +200,8 @@ func (s *Server) warmCache(ctx context.Context) {
 
 // startPeriodicRefresh starts background goroutines to periodically refresh caches.
 func (s *Server) startPeriodicRefresh(ctx context.Context) {
-	// Periodic refresh for resources
-	s.mcpCache.StartPeriodicRefresh(ctx, cache.CacheKeyResources, s.cfg.CacheRefreshInterval, func(ctx context.Context) ([]byte, error) {
+	// Create fetcher for resources
+	resourcesFetcher := func(ctx context.Context) ([]byte, error) {
 		pages, err := s.client.GetAllPages(ctx)
 		if err != nil {
 			return nil, err
@@ -182,10 +214,10 @@ func (s *Server) startPeriodicRefresh(ctx context.Context) {
 			}
 		}
 		return s.serializePages(resourcePages)
-	})
+	}
 
-	// Periodic refresh for prompts
-	s.mcpCache.StartPeriodicRefresh(ctx, cache.CacheKeyPrompts, s.cfg.CacheRefreshInterval, func(ctx context.Context) ([]byte, error) {
+	// Create fetcher for prompts
+	promptsFetcher := func(ctx context.Context) ([]byte, error) {
 		pages, err := s.client.GetAllPages(ctx)
 		if err != nil {
 			return nil, err
@@ -198,7 +230,17 @@ func (s *Server) startPeriodicRefresh(ctx context.Context) {
 			}
 		}
 		return s.serializePages(promptPages)
-	})
+	}
+
+	// Start periodic refresh for resources
+	s.mcpCache.StartPeriodicRefresh(ctx, cache.CacheKeyResources, s.cfg.CacheRefreshInterval, resourcesFetcher)
+
+	// Start periodic refresh for prompts
+	s.mcpCache.StartPeriodicRefresh(ctx, cache.CacheKeyPrompts, s.cfg.CacheRefreshInterval, promptsFetcher)
+
+	// Refresh immediately on startup (non-blocking)
+	go s.mcpCache.RefreshOnce(ctx, cache.CacheKeyResources, resourcesFetcher)
+	go s.mcpCache.RefreshOnce(ctx, cache.CacheKeyPrompts, promptsFetcher)
 }
 
 // serializePages serializes pages to JSON bytes.

@@ -137,6 +137,11 @@ func (m *MCPCache) Get(ctx context.Context, key string) ([]byte, error) {
 	return m.cache.Get(ctx, key)
 }
 
+// RefreshOnce triggers an immediate cache refresh for a given key.
+func (m *MCPCache) RefreshOnce(ctx context.Context, key string, fetcher Fetcher) {
+	m.refreshOnce(ctx, key, fetcher)
+}
+
 // StopPeriodicRefresh stops the periodic refresh for a key.
 func (m *MCPCache) StopPeriodicRefresh(key string) {
 	m.mu.Lock()

@@ -5,11 +5,19 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug Notion MCP Server",
+            "name": "Debug 3101",
             "type": "go",
             "request": "launch",
             "program": "${workspaceFolder}/main.go",
             "args": ["serve","-p","3101"],
+            "envFile": "${workspaceFolder}/.env",
+        },
+        {
+            "name": "Debug 3100",
+            "type": "go",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.go",
+            "args": ["serve","-p","3100"],
             "envFile": "${workspaceFolder}/.env",
         }
     ]
