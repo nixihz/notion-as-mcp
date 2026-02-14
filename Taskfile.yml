@@ -4,9 +4,9 @@ version: '3'
 
 vars:
   PORT: 3100
-  NOTION_DATABASE_ID: 
+  NOTION_DATABASE_ID:
     sh: echo $NOTION_DATABASE_ID
-  NOTION_API_KEY: 
+  NOTION_API_KEY:
     sh: echo $NOTION_API_KEY
 
 tasks:

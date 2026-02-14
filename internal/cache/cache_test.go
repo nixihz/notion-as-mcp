@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+const benchKey = "bench-key"
+
 func TestMemoryCache(t *testing.T) {
 	ctx := context.Background()
 	c, err := NewMemoryCache()
@@ -209,7 +211,7 @@ func BenchmarkMemoryCacheSet(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		key := "bench-key"
+		key := benchKey
 		c.Set(ctx, key, value, 5*time.Minute)
 	}
 }
@@ -219,7 +221,7 @@ func BenchmarkMemoryCacheGet(b *testing.B) {
 	c, _ := NewMemoryCache()
 	defer c.Close()
 
-	key := "bench-key"
+	key := benchKey
 	value := []byte("benchmark-value")
 	c.Set(ctx, key, value, 5*time.Minute)
 
@@ -238,7 +240,7 @@ func BenchmarkLayeredCacheGet(b *testing.B) {
 	lc := NewLayeredCache(l1, l2)
 	defer lc.Close()
 
-	key := "bench-key"
+	key := benchKey
 	value := []byte("benchmark-value")
 	lc.Set(ctx, key, value, 5*time.Minute)
 

@@ -51,7 +51,8 @@ func (lc *layeredCache) Set(ctx context.Context, key string, value []byte, ttl t
 		return err
 	}
 	if err := lc.l2.Set(ctx, key, value, ttl); err != nil {
-		// Log warning but don't fail
+		// Log warning but don't fail - L2 is optional
+		_ = err
 	}
 	return nil
 }

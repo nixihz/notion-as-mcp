@@ -9,11 +9,10 @@ import (
 
 // memoryCache implements an in-memory cache using a map with RWMutex.
 type memoryCache struct {
-	mu       sync.RWMutex
-	items    map[string]memoryItem
-	stats    Stats
-	maxSize  int
-	maxBytes int64
+	mu      sync.RWMutex
+	items   map[string]memoryItem
+	stats   Stats
+	maxSize int
 }
 
 type memoryItem struct {

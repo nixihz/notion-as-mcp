@@ -11,7 +11,7 @@ import (
 
 // fileCache implements a file-based cache.
 type fileCache struct {
-	dir       string
+	dir        string
 	defaultTTL time.Duration
 }
 

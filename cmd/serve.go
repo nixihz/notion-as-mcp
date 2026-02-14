@@ -59,7 +59,7 @@ and tools based on your Notion database.`,
 			if err != nil {
 				return fmt.Errorf("create server: %w", err)
 			}
-			defer srv.Stop()
+			defer func() { _ = srv.Stop() }()
 
 			// Setup context with cancellation
 			ctx, cancel := context.WithCancel(context.Background())

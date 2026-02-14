@@ -121,9 +121,7 @@ func TestGet(t *testing.T) {
 		defer func() { defaultLogger = origLogger }()
 
 		logger := Get()
-		if logger != nil {
-			// This is actually OK - it might return the default slog logger
-		}
+		_ = logger // Logger might return default slog logger
 	})
 }
 

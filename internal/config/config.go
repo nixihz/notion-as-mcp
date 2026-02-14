@@ -20,8 +20,9 @@ type Config struct {
 	NotionTypeField  string `json:"notion_type_field"`
 
 	// Cache configuration
-	CacheTTL time.Duration `json:"cache_ttl"`
-	CacheDir string        `json:"cache_dir"`
+	CacheTTL             time.Duration `json:"cache_ttl"`
+	CacheDir             string        `json:"cache_dir"`
+	CacheRefreshInterval time.Duration `json:"cache_refresh_interval"`
 
 	// Logging configuration
 	LogLevel string `json:"log_level"`
@@ -42,17 +43,18 @@ type Config struct {
 
 // Default values.
 const (
-	defaultTypeField   = "Type"
-	defaultCacheTTL    = 5 * time.Minute
-	defaultCacheDir    = "~/.cache/notion-as-mcp"
-	defaultLogLevel    = "info"
-	defaultExecTimeout = 30 * time.Second
-	defaultExecLang    = "bash,python,js,javascript,ts,typescript"
-	defaultPollInt     = 60 * time.Second
-	defaultRefreshOn   = true
-	defaultServerHost  = "0.0.0.0"
-	defaultServerPort  = 3100
-	defaultTransport   = "streamable"
+	defaultTypeField       = "Type"
+	defaultCacheTTL        = 5 * time.Minute
+	defaultCacheDir        = "~/.cache/notion-as-mcp"
+	defaultCacheRefreshInt = 5 * time.Minute
+	defaultLogLevel        = "info"
+	defaultExecTimeout     = 30 * time.Second
+	defaultExecLang        = "bash,python,js,javascript,ts,typescript"
+	defaultPollInt         = 60 * time.Second
+	defaultRefreshOn       = true
+	defaultServerHost      = "0.0.0.0"
+	defaultServerPort      = 3100
+	defaultTransport       = "streamable"
 )
 
 // Load loads configuration from environment variables and .env file.
@@ -61,17 +63,18 @@ func Load() (*Config, error) {
 	_ = godotenv.Load()
 
 	cfg := &Config{
-		NotionTypeField: defaultTypeField,
-		CacheTTL:        defaultCacheTTL,
-		CacheDir:        defaultCacheDir,
-		LogLevel:        defaultLogLevel,
-		ExecTimeout:     defaultExecTimeout,
-		ExecLanguages:   defaultExecLang,
-		PollInterval:    defaultPollInt,
-		RefreshOnStart:  defaultRefreshOn,
-		ServerHost:      defaultServerHost,
-		ServerPort:      defaultServerPort,
-		TransportType:   defaultTransport,
+		NotionTypeField:      defaultTypeField,
+		CacheTTL:             defaultCacheTTL,
+		CacheDir:             defaultCacheDir,
+		CacheRefreshInterval: defaultCacheRefreshInt,
+		LogLevel:             defaultLogLevel,
+		ExecTimeout:          defaultExecTimeout,
+		ExecLanguages:        defaultExecLang,
+		PollInterval:         defaultPollInt,
+		RefreshOnStart:       defaultRefreshOn,
+		ServerHost:           defaultServerHost,
+		ServerPort:           defaultServerPort,
+		TransportType:        defaultTransport,
 	}
 
 	// Required: Notion API Key
@@ -105,6 +108,15 @@ func Load() (*Config, error) {
 	// Optional: Cache directory
 	if cdir := os.Getenv("CACHE_DIR"); cdir != "" {
 		cfg.CacheDir = cdir
+	}
+
+	// Optional: Cache refresh interval
+	if cri := os.Getenv("CACHE_REFRESH_INTERVAL"); cri != "" {
+		interval, err := time.ParseDuration(cri)
+		if err != nil {
+			return nil, fmt.Errorf("invalid CACHE_REFRESH_INTERVAL: %w", err)
+		}
+		cfg.CacheRefreshInterval = interval
 	}
 
 	// Optional: Log level

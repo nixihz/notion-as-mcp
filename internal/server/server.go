@@ -3,6 +3,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -19,11 +20,19 @@ import (
 	"github.com/nixihz/notion-as-mcp/internal/tools"
 )
 
+// Page type constants
+const (
+	pageTypePrompt   = "prompt"
+	pageTypeResource = "resource"
+	pageTypeTool     = "tool"
+)
+
 // Server represents the MCP server.
 type Server struct {
 	cfg      *config.Config
 	client   *notion.Client
 	cache    cache.Cache
+	mcpCache *cache.MCPCache
 	logger   *slog.Logger
 	impl     *mcp.Implementation
 	executor *tools.Executor
@@ -55,11 +64,15 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		cfg.NotionTypeField,
 	)
 
+	// Initialize MCP cache manager
+	mcpCacheManager := cache.NewMCPCache(cacheStore, log)
+
 	srv := &Server{
-		cfg:    cfg,
-		client: client,
-		cache:  cacheStore,
-		logger: log,
+		cfg:      cfg,
+		client:   client,
+		cache:    cacheStore,
+		mcpCache: mcpCacheManager,
+		logger:   log,
 		impl: &mcp.Implementation{
 			Name:    "notion-as-mcp",
 			Version: "1.0.0",
@@ -73,16 +86,124 @@ func NewServer(cfg *config.Config) (*Server, error) {
 
 // Start starts the MCP server with the configured transport.
 func (s *Server) Start(ctx context.Context) error {
-	// Get all pages from Notion and filter by type
-	allPages, err := s.client.GetAllPages(context.Background())
-	if err != nil {
-		s.logger.Warn("failed to query pages", slog.String("error", err.Error()))
-	}
+	// Warm cache on startup
+	s.warmCache(ctx)
+
+	// Start periodic refresh in background
+	s.startPeriodicRefresh(ctx)
+
+	// Get all pages - try cache first, then fallback to Notion
+	allPages := s.getAllPagesWithCache(ctx)
 
 	if s.cfg.TransportType == "streamable" {
 		return s.startStreamable(ctx, allPages)
 	}
 	return s.startStdio(ctx, allPages)
+}
+
+// getAllPagesWithCache tries to get pages from cache first, falls back to Notion.
+func (s *Server) getAllPagesWithCache(ctx context.Context) []notion.Page {
+	// Try cache first
+	cachedData, err := s.mcpCache.Get(ctx, cache.CacheKeyResources)
+	if err == nil && cachedData != nil {
+		var pages []notion.Page
+		if json.Unmarshal(cachedData, &pages) == nil {
+			s.logger.Info("using cached pages for resources")
+			return pages
+		}
+	}
+
+	// Cache miss or error, fetch from Notion
+	s.logger.Info("fetching pages from Notion (cache miss)")
+	pages, err := s.client.GetAllPages(ctx)
+	if err != nil {
+		s.logger.Warn("failed to query pages", slog.String("error", err.Error()))
+		return nil
+	}
+	return pages
+}
+
+// warmCache fetches and caches all pages on startup.
+func (s *Server) warmCache(ctx context.Context) {
+	// Warm resources cache
+	err := s.mcpCache.Warm(ctx, cache.CacheKeyResources, func(ctx context.Context) ([]byte, error) {
+		pages, err := s.client.GetAllPages(ctx)
+		if err != nil {
+			return nil, err
+		}
+		// Filter only resource pages
+		var resourcePages []notion.Page
+		for _, p := range pages {
+			pageType := notion.GetTypeFromProperties(p.Properties, s.cfg.NotionTypeField)
+			if pageType == pageTypeResource {
+				resourcePages = append(resourcePages, p)
+			}
+		}
+		return s.serializePages(resourcePages)
+	})
+	if err != nil {
+		s.logger.Warn("failed to warm resources cache", slog.String("error", err.Error()))
+	}
+
+	// Warm prompts cache
+	err = s.mcpCache.Warm(ctx, cache.CacheKeyPrompts, func(ctx context.Context) ([]byte, error) {
+		pages, err := s.client.GetAllPages(ctx)
+		if err != nil {
+			return nil, err
+		}
+		// Filter only prompt pages
+		var promptPages []notion.Page
+		for _, p := range pages {
+			pageType := notion.GetTypeFromProperties(p.Properties, s.cfg.NotionTypeField)
+			if pageType == pageTypePrompt {
+				promptPages = append(promptPages, p)
+			}
+		}
+		return s.serializePages(promptPages)
+	})
+	if err != nil {
+		s.logger.Warn("failed to warm prompts cache", slog.String("error", err.Error()))
+	}
+}
+
+// startPeriodicRefresh starts background goroutines to periodically refresh caches.
+func (s *Server) startPeriodicRefresh(ctx context.Context) {
+	// Periodic refresh for resources
+	s.mcpCache.StartPeriodicRefresh(ctx, cache.CacheKeyResources, s.cfg.CacheRefreshInterval, func(ctx context.Context) ([]byte, error) {
+		pages, err := s.client.GetAllPages(ctx)
+		if err != nil {
+			return nil, err
+		}
+		var resourcePages []notion.Page
+		for _, p := range pages {
+			pageType := notion.GetTypeFromProperties(p.Properties, s.cfg.NotionTypeField)
+			if pageType == pageTypeResource {
+				resourcePages = append(resourcePages, p)
+			}
+		}
+		return s.serializePages(resourcePages)
+	})
+
+	// Periodic refresh for prompts
+	s.mcpCache.StartPeriodicRefresh(ctx, cache.CacheKeyPrompts, s.cfg.CacheRefreshInterval, func(ctx context.Context) ([]byte, error) {
+		pages, err := s.client.GetAllPages(ctx)
+		if err != nil {
+			return nil, err
+		}
+		var promptPages []notion.Page
+		for _, p := range pages {
+			pageType := notion.GetTypeFromProperties(p.Properties, s.cfg.NotionTypeField)
+			if pageType == pageTypePrompt {
+				promptPages = append(promptPages, p)
+			}
+		}
+		return s.serializePages(promptPages)
+	})
+}
+
+// serializePages serializes pages to JSON bytes.
+func (s *Server) serializePages(pages []notion.Page) ([]byte, error) {
+	return json.Marshal(pages)
 }
 
 // startStreamable starts the MCP server with streamable HTTP transport.
@@ -140,6 +261,10 @@ func (s *Server) startStdio(ctx context.Context, allPages []notion.Page) error {
 
 // Stop stops the MCP server.
 func (s *Server) Stop() error {
+	// Stop periodic refresh
+	if s.mcpCache != nil {
+		s.mcpCache.StopAll()
+	}
 	if s.cache != nil {
 		s.cache.Close()
 	}
@@ -151,7 +276,7 @@ func (s *Server) registerPrompts(server *mcp.Server, allPages []notion.Page) {
 	// Filter pages by type using functional programming
 	promptPages := lo.Filter(allPages, func(page notion.Page, _ int) bool {
 		pageType := notion.GetTypeFromProperties(page.Properties, s.cfg.NotionTypeField)
-		return pageType == "prompt"
+		return pageType == pageTypePrompt
 	})
 
 	// Register each prompt page
@@ -167,7 +292,7 @@ func (s *Server) registerPrompts(server *mcp.Server, allPages []notion.Page) {
 		}
 
 		// Ensure name starts with lowercase letter
-		if len(promptName) > 0 && !(promptName[0] >= 'a' && promptName[0] <= 'z') {
+		if len(promptName) > 0 && (promptName[0] < 'a' || promptName[0] > 'z') {
 			// Prepend 'p_' if name doesn't start with lowercase letter
 			promptName = "p_" + promptName
 		}
@@ -191,7 +316,7 @@ func (s *Server) registerPrompts(server *mcp.Server, allPages []notion.Page) {
 func (s *Server) registerResources(server *mcp.Server, allPages []notion.Page) {
 	resourcePages := lo.Filter(allPages, func(page notion.Page, _ int) bool {
 		pageType := notion.GetTypeFromProperties(page.Properties, s.cfg.NotionTypeField)
-		return pageType == "resource"
+		return pageType == pageTypeResource
 	})
 
 	// Register each resource page
@@ -207,7 +332,7 @@ func (s *Server) registerResources(server *mcp.Server, allPages []notion.Page) {
 		}
 
 		// Ensure name starts with lowercase letter
-		if len(resourceName) > 0 && !(resourceName[0] >= 'a' && resourceName[0] <= 'z') {
+		if len(resourceName) > 0 && (resourceName[0] < 'a' || resourceName[0] > 'z') {
 			// Prepend 'r_' if name doesn't start with lowercase letter
 			resourceName = "r_" + resourceName
 		}
@@ -233,7 +358,7 @@ func (s *Server) registerTools(server *mcp.Server, allPages []notion.Page) {
 	// Filter pages by type
 	toolPages := lo.Filter(allPages, func(page notion.Page, _ int) bool {
 		pageType := notion.GetTypeFromProperties(page.Properties, s.cfg.NotionTypeField)
-		return pageType == "tool"
+		return pageType == pageTypeTool
 	})
 
 	// Register each tool page
